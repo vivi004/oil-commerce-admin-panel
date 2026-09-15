@@ -1,0 +1,19 @@
+SKU,Product Name,Variant Size,Current MRP,New MRP,Current Selling Price,New Selling Price,Current Stock,New Stock,GST Rate,Barcode,Category,Brand,Mandi Seed Rate Per Kg,Status,Notes
+NPO-GNO-200ML,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),200ml,110,115,95,99,80,100,5%,890123456011,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Batch #412 New Harvest
+NPO-GNO-500ML,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),500ml,210,220,185,195,95,110,5%,890123456012,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Batch #412 New Harvest
+NPO-GNO-1L,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),1L,390,395,340,355,120,75,5%,890123456013,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Mandi seed hike +₹4/kg
+NPO-GNO-5L,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),5L,1850,1920,1650,1710,40,25,5%,890123456014,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Tin packaging adjustment
+NPO-GNO-15L,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),15L,4200,4350,3850,3990,10,15,5%,890123456015,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Bulk commercial tin
+NPO-VCO-200ML,Cold Pressed Virgin Coconut Oil (Thengai Ennai),200ml,145,145,130,130,50,60,5%,890123456021,Coconut Oil,Nisha Pure Oils,195,ACTIVE,Stable copra price
+NPO-VCO-500ML,Cold Pressed Virgin Coconut Oil (Thengai Ennai),500ml,280,270,250,230,65,65,5%,890123456022,Coconut Oil,Nisha Pure Oils,195,ACTIVE,Kangayam copra discount promo
+NPO-VCO-1L,Cold Pressed Virgin Coconut Oil (Thengai Ennai),1L,520,520,470,470,60,80,5%,890123456023,Coconut Oil,Nisha Pure Oils,195,ACTIVE,Stable copra price
+NPO-VCO-5L,Cold Pressed Virgin Coconut Oil (Thengai Ennai),5L,2450,2450,2200,2200,15,20,5%,890123456024,Coconut Oil,Nisha Pure Oils,195,ACTIVE,Can packaging
+NPO-SES-200ML,Traditional Wood Pressed Sesame Oil (Gingelly / Nalla Ennai),200ml,170,175,150,155,40,50,5%,890123456031,Sesame Oil (Gingelly Oil),Nisha Pure Oils,230,ACTIVE,Black sesame mandi rise
+NPO-SES-500ML,Traditional Wood Pressed Sesame Oil (Gingelly / Nalla Ennai),500ml,340,350,310,320,50,60,5%,890123456032,Sesame Oil (Gingelly Oil),Nisha Pure Oils,230,ACTIVE,Palm jaggery blend
+NPO-SES-1L,Traditional Wood Pressed Sesame Oil (Gingelly / Nalla Ennai),1L,620,640,560,580,42,50,5%,890123456033,Sesame Oil (Gingelly Oil),Nisha Pure Oils,230,ACTIVE,Erode market price update
+NPO-SES-5L,Traditional Wood Pressed Sesame Oil (Gingelly / Nalla Ennai),5L,2950,3050,2750,2850,8,12,5%,890123456034,Sesame Oil (Gingelly Oil),Nisha Pure Oils,230,ACTIVE,Catering can size
+VG-LMP-500ML,Varshini Gold Deepam Oil (Aromatic Pancha Deepa Lamp Oil),500ml,130,130,110,110,120,150,12%,890123456041,Lamp Oil (Puja Oil),Varshini Gold,115,ACTIVE,Puja special blend
+VG-LMP-1L,Varshini Gold Deepam Oil (Aromatic Pancha Deepa Lamp Oil),1L,230,230,195,195,110,130,12%,890123456042,Lamp Oil (Puja Oil),Varshini Gold,115,ACTIVE,Puja special blend
+VG-LMP-5L,Varshini Gold Deepam Oil (Aromatic Pancha Deepa Lamp Oil),5L,1100,1100,950,950,50,60,12%,890123456043,Lamp Oil (Puja Oil),Varshini Gold,115,ACTIVE,Temple festival tin
+NPO-CAKE-5KG,High-Protein Groundnut Oil Cake (Kadalai Pinnakku),5Kg,320,330,280,290,40,55,0%,890123456051,Oil Cake,Nisha Pure Oils,48,ACTIVE,Livestock feed demand
+NPO-CAKE-15KG,High-Protein Groundnut Oil Cake (Kadalai Pinnakku),15Kg,890,920,780,810,25,30,0%,890123456052,Oil Cake,Nisha Pure Oils,48,ACTIVE,Dairy farm sack
