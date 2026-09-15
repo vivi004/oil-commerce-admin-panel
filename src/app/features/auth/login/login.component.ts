@@ -197,8 +197,23 @@ export class LoginComponent {
   }
 
   async quickLogin(role: Role): Promise<void> {
-    await this.authService.switchRole(role);
-    this.redirectByRole();
+    const roleCredentials: Record<Role, { email: string; password: string }> = {
+      [Role.SUPER_ADMIN]: { email: 'superadmin@nishapureoils.com', password: 'Admin@123' },
+      [Role.TENANT_ADMIN]: { email: 'admin@nishapureoils.com', password: 'Admin@123' },
+      [Role.INVENTORY_MANAGER]: { email: 'inventory@nishapureoils.com', password: 'Admin@123' },
+      [Role.ORDER_MANAGER]: { email: 'orders@nishapureoils.com', password: 'Admin@123' },
+      [Role.PRODUCT_MANAGER]: { email: 'catalog@nishapureoils.com', password: 'Admin@123' },
+      [Role.ACCOUNTANT]: { email: 'accounts@nishapureoils.com', password: 'Admin@123' },
+      [Role.CUSTOMER_SUPPORT]: { email: 'support@nishapureoils.com', password: 'Admin@123' }
+    };
+
+    const cred = roleCredentials[role] || { email: 'admin@nishapureoils.com', password: 'Admin@123' };
+    this.loginForm.patchValue({
+      email: cred.email,
+      password: cred.password
+    });
+
+    await this.onSubmit();
   }
 
   private redirectByRole(): void {

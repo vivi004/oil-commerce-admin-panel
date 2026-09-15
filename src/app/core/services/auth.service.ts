@@ -106,7 +106,7 @@ export class AuthService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: backendEmail, password: 'Admin@123' })
-      }, 1200).then(async (res) => {
+      }, environment.apiTimeout).then(async (res) => {
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.data?.accessToken) {
@@ -129,7 +129,7 @@ export class AuthService {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
-          }, 1200);
+          }, environment.apiTimeout);
 
           if (response.ok) {
             const result = await response.json();
