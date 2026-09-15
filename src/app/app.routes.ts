@@ -128,13 +128,13 @@ export const routes: Routes = [
   // Root redirect
   {
     path: '',
-    redirectTo: '/tenant-admin/dashboard',
+    redirectTo: '/auth/login',
     pathMatch: 'full'
   },
 
   // Wildcard
   {
     path: '**',
-    redirectTo: '/tenant-admin/dashboard'
+    redirectTo: '/auth/login'
   }
 ];
