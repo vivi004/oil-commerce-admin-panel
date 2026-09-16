@@ -4,6 +4,23 @@ import { StockMovementType } from '../enums/app.enums';
 import { INITIAL_STOCK_MOVEMENTS } from './mock-data';
 import { ProductService } from './product.service';
 
+export interface StockInventoryItem {
+  productId: string;
+  productName: string;
+  primaryImage: string;
+  brand: string;
+  category: string;
+  sku: string;
+  variantSize: VariantSize;
+  sellingPrice: number;
+  mrp: number;
+  stockQuantity: number;
+  reorderLevel: number;
+  batchNumber: string;
+  warehouseLocation: string;
+  status: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -17,11 +34,43 @@ export class InventoryService {
   // Computed signals
   readonly totalMovementsCount = computed(() => this.movementsSignal().length);
 
+  readonly allStockItems = computed<StockInventoryItem[]>(() => {
+    const products = this.productService.products();
+    const items: StockInventoryItem[] = [];
+    for (const prod of products) {
+      for (const v of prod.variants) {
+        if (!v.isEnabled) continue;
+        let status: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK' = 'IN_STOCK';
+        if (v.stockQuantity === 0) status = 'OUT_OF_STOCK';
+        else if (v.stockQuantity <= v.reorderLevel) status = 'LOW_STOCK';
+
+        items.push({
+          productId: prod.id,
+          productName: prod.name,
+          primaryImage: prod.primaryImage,
+          brand: prod.brand,
+          category: prod.category,
+          sku: v.sku,
+          variantSize: v.size,
+          sellingPrice: v.sellingPrice,
+          mrp: v.mrp,
+          stockQuantity: v.stockQuantity,
+          reorderLevel: v.reorderLevel,
+          batchNumber: `MC-${prod.id.slice(-4).toUpperCase()}-B${v.size.replace(/\D/g, '') || '1'}`,
+          warehouseLocation: 'Unit #1 Mara Chekku Shed',
+          status
+        });
+      }
+    }
+    return items;
+  });
+
   readonly recentMovements = computed(() => {
     return [...this.movementsSignal()]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 15);
   });
+
 
   // Calculate low stock variants across all products
   readonly lowStockVariants = computed(() => {

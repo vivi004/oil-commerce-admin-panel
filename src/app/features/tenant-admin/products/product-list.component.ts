@@ -26,15 +26,26 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Cold-Pressed Oils & Commodities</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Manage 10 oil categories, multi-pack sizes (100ml to 15Kg), and retail pricing.</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Manage 10 oil categories, multi-pack sizes (100ml to 15Kg), and retail pricing synced with storefront.</p>
         </div>
-        <a
-          routerLink="/tenant-admin/products/new"
-          class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs shadow-md shadow-amber-500/20 transition-colors flex items-center justify-center gap-2"
-        >
-          <span class="material-symbols-outlined text-[18px]">add_circle</span>
-          <span>Add Oil Product</span>
-        </a>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="refreshCatalog()"
+            class="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs"
+            title="Sync products with backend and storefront"
+          >
+            <span class="material-symbols-outlined text-[16px]">sync</span>
+            <span>Sync Live</span>
+          </button>
+          <a
+            routerLink="/tenant-admin/products/new"
+            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs shadow-md shadow-amber-500/20 transition-colors flex items-center justify-center gap-2"
+          >
+            <span class="material-symbols-outlined text-[18px]">add_circle</span>
+            <span>Add Oil Product</span>
+          </a>
+        </div>
       </div>
 
       <!-- Data Table with Filters -->
@@ -132,7 +143,16 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
             </td>
 
             <!-- Actions -->
-            <td class="px-4 py-3 text-right space-x-1">
+            <td class="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+              <a
+                [href]="productService.getStorefrontProductUrl(prod.id)"
+                target="_blank"
+                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-[11px] font-semibold transition-colors border border-emerald-200/60 dark:border-emerald-800/40"
+                title="View on Customer Storefront"
+              >
+                <span class="material-symbols-outlined text-[15px]">open_in_new</span>
+                <span class="hidden sm:inline">Store</span>
+              </a>
               <a
                 [routerLink]="['/tenant-admin/products/edit', prod.id]"
                 class="inline-block p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -222,6 +242,10 @@ export class ProductListComponent {
 
   onSearch(q: string): void {
     this.searchQuery.set(q);
+  }
+
+  refreshCatalog(): void {
+    this.productService.syncFromBackend();
   }
 
   confirmDelete(prod: Product): void {

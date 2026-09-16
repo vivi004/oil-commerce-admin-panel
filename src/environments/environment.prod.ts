@@ -1,6 +1,7 @@
 export const environment = {
   production: true,
-  // Replace with your live Render backend URL (e.g. https://<your-service>.onrender.com/api)
   apiBaseUrl: 'https://oil-commerce-backend.onrender.com/api',
+  storefrontUrl: 'https://oil-commerce-frontend.onrender.com',
   apiTimeout: 10000,
 };
+

@@ -1,7 +1,7 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { InventoryService } from '../../../core/services/inventory.service';
+import { InventoryService, StockInventoryItem } from '../../../core/services/inventory.service';
 import { ProductService } from '../../../core/services/product.service';
 import { StockMovementType } from '../../../core/enums/app.enums';
 import { VariantSize } from '../../../core/models/app.models';
@@ -19,16 +19,28 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Warehouse & Stock Operations</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Track Mara Chekku cold-pressed oil extractions, packaging batches, and warehouse movements.</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Mara Chekku cold-pressed oil batches, live inventory levels per SKU, and movement audit ledger.</p>
         </div>
-        <button
-          type="button"
-          (click)="openAdjustModal()"
-          class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs shadow-md shadow-amber-500/20 transition-colors flex items-center justify-center gap-2"
-        >
-          <span class="material-symbols-outlined text-[18px]">tune</span>
-          <span>Quick Stock Adjustment</span>
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- Live Sync -->
+          <button
+            type="button"
+            (click)="syncLive()"
+            class="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs"
+            title="Sync stock levels with database"
+          >
+            <span class="material-symbols-outlined text-[16px]">sync</span>
+            <span>Sync Live</span>
+          </button>
+          <button
+            type="button"
+            (click)="openAdjustModal()"
+            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs shadow-md shadow-amber-500/20 transition-colors flex items-center justify-center gap-2"
+          >
+            <span class="material-symbols-outlined text-[18px]">tune</span>
+            <span>Quick Stock Adjustment</span>
+          </button>
+        </div>
       </div>
 
       <!-- Low Stock Alert Banner -->
@@ -49,21 +61,111 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
         <button
           type="button"
           (click)="openAdjustModalForFirstLow()"
-          class="w-full sm:w-auto px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors shrink-0 text-center"
+          class="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors shrink-0 text-center"
         >
           Batch Stock In
         </button>
       </div>
 
-      <!-- Movements Ledger Table -->
-      <div class="space-y-2">
-        <h2 class="text-sm font-bold text-slate-900 dark:text-white">Warehouse Movement Ledger</h2>
+      <!-- Navigation Tabs -->
+      <div class="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          type="button"
+          (click)="activeTab.set('stock')"
+          [ngClass]="activeTab() === 'stock' ? 'border-amber-500 text-amber-600 dark:text-amber-400 font-bold bg-amber-50/50 dark:bg-amber-950/30' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium'"
+          class="px-4 py-2 rounded-xl border text-xs flex items-center gap-2 transition-all"
+        >
+          <span class="material-symbols-outlined text-[18px]">inventory_2</span>
+          <span>Live Stock Levels ({{ inventoryService.allStockItems().length }} SKUs)</span>
+        </button>
+        <button
+          type="button"
+          (click)="activeTab.set('movements')"
+          [ngClass]="activeTab() === 'movements' ? 'border-amber-500 text-amber-600 dark:text-amber-400 font-bold bg-amber-50/50 dark:bg-amber-950/30' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium'"
+          class="px-4 py-2 rounded-xl border text-xs flex items-center gap-2 transition-all"
+        >
+          <span class="material-symbols-outlined text-[18px]">history</span>
+          <span>Movement Audit Ledger ({{ inventoryService.movements().length }})</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: LIVE STOCK LEVELS TABLE -->
+      <div *ngIf="activeTab() === 'stock'" class="space-y-4">
         <app-data-table
-          [columns]="columns"
+          [columns]="stockColumns"
+          [totalCount]="filteredStockItems().length"
+          [pageSize]="10"
+          searchPlaceholder="Search product name, SKU, or pack size..."
+          (search)="onStockSearch($event)"
+        >
+          <ng-container table-rows>
+            <tr *ngFor="let item of filteredStockItems()" class="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+              <!-- Product & Size -->
+              <td class="px-4 py-3 font-semibold text-slate-900 dark:text-white">
+                <div class="flex items-center gap-3">
+                  <img [src]="item.primaryImage" [alt]="item.productName" class="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-2xs" />
+                  <div>
+                    <div class="text-xs font-bold">{{ item.productName }}</div>
+                    <div class="text-[10px] text-slate-400 font-mono">{{ item.sku }} • <span class="text-amber-600 dark:text-amber-400 font-semibold">{{ item.variantSize }}</span></div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Batch & Mill Location -->
+              <td class="px-4 py-3 text-xs text-slate-600 dark:text-slate-400">
+                <div class="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200">{{ item.batchNumber }}</div>
+                <div class="text-[10px] text-slate-400">{{ item.warehouseLocation }}</div>
+              </td>
+
+              <!-- Selling Price / MRP -->
+              <td class="px-4 py-3 text-xs font-semibold text-slate-900 dark:text-white">
+                <div>₹{{ item.sellingPrice }}</div>
+                <div class="text-[10px] text-slate-400 line-through">₹{{ item.mrp }}</div>
+              </td>
+
+              <!-- Current Stock -->
+              <td class="px-4 py-3 text-right">
+                <div [ngClass]="item.stockQuantity === 0 ? 'text-rose-600 font-black' : item.stockQuantity <= item.reorderLevel ? 'text-amber-600 font-bold' : 'text-slate-900 dark:text-white font-bold'" class="text-xs">
+                  {{ item.stockQuantity }} units
+                </div>
+                <div class="text-[10px] text-slate-400">Safety: {{ item.reorderLevel }}</div>
+              </td>
+
+              <!-- Stock Status Badge -->
+              <td class="px-4 py-3">
+                <app-badge
+                  [variant]="item.status === 'IN_STOCK' ? 'emerald' : item.status === 'LOW_STOCK' ? 'amber' : 'rose'"
+                  [dot]="true"
+                >
+                  {{ item.status === 'IN_STOCK' ? 'In Stock' : item.status === 'LOW_STOCK' ? 'Low Stock' : 'Depleted' }}
+                </app-badge>
+              </td>
+
+              <!-- Actions -->
+              <td class="px-4 py-3 text-right">
+                <button
+                  type="button"
+                  (click)="adjustItemStock(item)"
+                  class="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold text-xs border border-amber-200/60 dark:border-amber-800/40 transition-colors inline-flex items-center gap-1"
+                  title="Adjust or Restock this SKU"
+                >
+                  <span class="material-symbols-outlined text-[15px]">add_box</span>
+                  <span>Restock</span>
+                </button>
+              </td>
+            </tr>
+          </ng-container>
+        </app-data-table>
+      </div>
+
+      <!-- TAB 2: MOVEMENTS LEDGER TABLE -->
+      <div *ngIf="activeTab() === 'movements'" class="space-y-4">
+        <app-data-table
+          [columns]="movementColumns"
           [totalCount]="filteredMovements().length"
           [pageSize]="10"
           searchPlaceholder="Search by product, SKU, or batch reference..."
-          (search)="onSearch($event)"
+          (search)="onMovementSearch($event)"
         >
           <ng-container table-rows>
             <tr *ngFor="let m of filteredMovements()" class="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
@@ -205,10 +307,21 @@ export class InventoryManagementComponent {
   private fb = inject(FormBuilder);
 
   readonly StockMovementType = StockMovementType;
+  activeTab = signal<'stock' | 'movements'>('stock');
   isAdjustModalOpen = signal<boolean>(false);
-  searchQuery = signal<string>('');
+  stockSearchQuery = signal<string>('');
+  movementSearchQuery = signal<string>('');
 
-  columns: ColumnDef[] = [
+  stockColumns: ColumnDef[] = [
+    { key: 'productName', label: 'Oil Product & SKU', sortable: true },
+    { key: 'batchNumber', label: 'Batch # & Mill Station', sortable: true },
+    { key: 'sellingPrice', label: 'Selling Price / MRP', sortable: true },
+    { key: 'stockQuantity', label: 'On-Hand Stock', sortable: true, align: 'right' },
+    { key: 'status', label: 'Status', sortable: true },
+    { key: 'actions', label: 'Actions', align: 'right' }
+  ];
+
+  movementColumns: ColumnDef[] = [
     { key: 'createdAt', label: 'Date & Time', sortable: true },
     { key: 'productName', label: 'Product & Variant', sortable: true },
     { key: 'type', label: 'Type', sortable: true },
@@ -234,9 +347,23 @@ export class InventoryManagementComponent {
     return prod ? prod.variants.filter(v => v.isEnabled) : [];
   });
 
+  filteredStockItems = computed(() => {
+    let list = this.inventoryService.allStockItems();
+    const q = this.stockSearchQuery().toLowerCase().trim();
+    if (q) {
+      list = list.filter(i =>
+        i.productName.toLowerCase().includes(q) ||
+        i.sku.toLowerCase().includes(q) ||
+        i.variantSize.toLowerCase().includes(q) ||
+        i.batchNumber.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  });
+
   filteredMovements = computed(() => {
     let list = this.inventoryService.movements();
-    const q = this.searchQuery().toLowerCase().trim();
+    const q = this.movementSearchQuery().toLowerCase().trim();
     if (q) {
       list = list.filter(m =>
         m.productName.toLowerCase().includes(q) ||
@@ -251,8 +378,16 @@ export class InventoryManagementComponent {
     return this.inventoryService.lowStockVariants().map(v => `${v.productName} (${v.variantSize})`).slice(0, 2).join(', ');
   }
 
-  onSearch(q: string): void {
-    this.searchQuery.set(q);
+  onStockSearch(q: string): void {
+    this.stockSearchQuery.set(q);
+  }
+
+  onMovementSearch(q: string): void {
+    this.movementSearchQuery.set(q);
+  }
+
+  syncLive(): void {
+    this.productService.syncFromBackend();
   }
 
   openAdjustModal(): void {
@@ -264,6 +399,17 @@ export class InventoryManagementComponent {
         quantityChange: 50
       });
     }
+    this.isAdjustModalOpen.set(true);
+  }
+
+  adjustItemStock(item: StockInventoryItem): void {
+    this.adjustForm.patchValue({
+      productId: item.productId,
+      sku: item.sku,
+      quantityChange: 50,
+      type: StockMovementType.STOCK_IN,
+      reason: `Restock batch for ${item.productName} (${item.variantSize})`
+    });
     this.isAdjustModalOpen.set(true);
   }
 

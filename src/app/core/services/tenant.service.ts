@@ -61,4 +61,20 @@ export class TenantService {
   deleteTenant(tenantId: string): void {
     this.tenantsSignal.update(tenants => tenants.filter(t => t.id !== tenantId));
   }
+
+  updatePlan(planId: string, updates: Partial<SubscriptionPlan>): void {
+    this.plansSignal.update(plans =>
+      plans.map(p => p.id === planId ? { ...p, ...updates } : p)
+    );
+  }
+
+  createPlan(planData: Omit<SubscriptionPlan, 'id'>): SubscriptionPlan {
+    const newPlan: SubscriptionPlan = {
+      ...planData,
+      id: 'plan-' + Date.now()
+    };
+    this.plansSignal.update(plans => [...plans, newPlan]);
+    return newPlan;
+  }
 }
+

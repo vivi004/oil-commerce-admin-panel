@@ -1,12 +1,14 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TenantService } from '../../../core/services/tenant.service';
 import { ExportService } from '../../../core/services/export.service';
+import { DataTableComponent, ColumnDef } from '../../../shared/components/data-table/data-table.component';
+import { BadgeComponent } from '../../../shared/components/badge/badge.component';
 
 @Component({
   selector: 'app-super-reports',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DataTableComponent, BadgeComponent],
   template: `
     <div class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -50,6 +52,71 @@ import { ExportService } from '../../../core/services/export.service';
           </div>
         </div>
       </div>
+
+      <!-- TENANT PERFORMANCE & REVENUE TABLE -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-slate-900 dark:text-white">Tenant Performance & SaaS Revenue Ledger</h2>
+          <span class="text-xs text-slate-400">Showing all multi-tenant mill enterprise metrics</span>
+        </div>
+
+        <app-data-table
+          [columns]="columns"
+          [totalCount]="filteredTenants().length"
+          [pageSize]="10"
+          searchPlaceholder="Search tenant brand, owner or plan..."
+          (search)="onSearch($event)"
+        >
+          <ng-container table-rows>
+            <tr *ngFor="let t of filteredTenants()" class="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+              <td class="px-4 py-3 font-semibold text-slate-900 dark:text-white">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center justify-center">
+                    {{ t.name.charAt(0) }}
+                  </div>
+                  <div>
+                    <div class="text-xs font-bold">{{ t.name }}</div>
+                    <div class="text-[10px] text-slate-400">{{ t.businessName }}</div>
+                  </div>
+                </div>
+              </td>
+
+              <td class="px-4 py-3 text-xs text-slate-600 dark:text-slate-400">
+                <div>{{ t.ownerName }}</div>
+                <div class="text-[10px] text-slate-400">{{ t.email }}</div>
+              </td>
+
+              <td class="px-4 py-3">
+                <span class="px-2 py-0.5 rounded-md text-xs font-bold bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60">
+                  {{ t.planTier }}
+                </span>
+              </td>
+
+              <td class="px-4 py-3 text-right font-black text-slate-900 dark:text-white text-xs">
+                ₹{{ t.mrr.toLocaleString() }}
+              </td>
+
+              <td class="px-4 py-3 text-right font-bold text-xs text-slate-800 dark:text-slate-200">
+                {{ t.totalOrders.toLocaleString() }}
+              </td>
+
+              <td class="px-4 py-3 text-right font-bold text-xs text-emerald-600 dark:text-emerald-400">
+                ₹{{ (t.totalOrders * 850).toLocaleString() }}
+              </td>
+
+              <td class="px-4 py-3">
+                <app-badge [variant]="t.status === 'ACTIVE' ? 'emerald' : 'rose'" [dot]="true">
+                  {{ t.status }}
+                </app-badge>
+              </td>
+
+              <td class="px-4 py-3 text-xs text-slate-400 text-right">
+                {{ t.createdAt }}
+              </td>
+            </tr>
+          </ng-container>
+        </app-data-table>
+      </div>
     </div>
   `
 })
@@ -57,6 +124,35 @@ export class SuperReportsComponent {
   tenantService = inject(TenantService);
   exportService = inject(ExportService);
   Math = Math;
+
+  searchQuery = signal<string>('');
+
+  columns: ColumnDef[] = [
+    { key: 'name', label: 'Tenant / Oil Brand', sortable: true },
+    { key: 'ownerName', label: 'Owner & Contact', sortable: true },
+    { key: 'planTier', label: 'Subscription Plan', sortable: true },
+    { key: 'mrr', label: 'Monthly SaaS MRR', sortable: true, align: 'right' },
+    { key: 'totalOrders', label: 'Store Orders', sortable: true, align: 'right' },
+    { key: 'gmv', label: 'Estimated GMV', align: 'right' },
+    { key: 'status', label: 'Status', sortable: true },
+    { key: 'createdAt', label: 'Joined On', align: 'right' }
+  ];
+
+  filteredTenants = computed(() => {
+    let list = this.tenantService.tenants();
+    const q = this.searchQuery().toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(t =>
+      t.name.toLowerCase().includes(q) ||
+      t.businessName.toLowerCase().includes(q) ||
+      t.ownerName.toLowerCase().includes(q) ||
+      t.planTier.toLowerCase().includes(q)
+    );
+  });
+
+  onSearch(q: string): void {
+    this.searchQuery.set(q);
+  }
 
   exportData(): void {
     const data = this.tenantService.tenants().map(t => ({
@@ -67,6 +163,7 @@ export class SuperReportsComponent {
       Plan: t.planTier,
       MRR: t.mrr,
       TotalOrders: t.totalOrders,
+      EstimatedGMV: t.totalOrders * 850,
       Status: t.status,
       JoinedDate: t.createdAt
     }));
