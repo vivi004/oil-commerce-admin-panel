@@ -92,7 +92,12 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
             <!-- Product & Thumbnail -->
             <td class="px-4 py-3 font-semibold text-slate-900 dark:text-white">
               <div class="flex items-center gap-3">
-                <img [src]="prod.primaryImage" [alt]="prod.name" class="w-11 h-11 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-2xs" />
+                <img
+                  [src]="productService.resolveImageUrl(prod.primaryImage)"
+                  [alt]="prod.name"
+                  (error)="onImgError($event)"
+                  class="w-11 h-11 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-2xs"
+                />
                 <div>
                   <div class="text-xs font-bold">{{ prod.name }}</div>
                   <div class="text-[10px] text-slate-400 font-mono">{{ prod.sku }} • {{ prod.brand }}</div>
@@ -246,6 +251,11 @@ export class ProductListComponent {
 
   refreshCatalog(): void {
     this.productService.syncFromBackend();
+  }
+
+  onImgError(e: Event): void {
+    const img = e.target as HTMLImageElement;
+    img.src = 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80';
   }
 
   confirmDelete(prod: Product): void {

@@ -36,7 +36,8 @@ export class ProductService {
     this.syncFromBackend();
   }
 
-  private isUuid(str: string): boolean {
+  isUuid(str?: string | null): boolean {
+    if (!str) return false;
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
   }
 
@@ -143,22 +144,68 @@ export class ProductService {
     return res;
   }
 
+  // --- Image Handling Helpers ---
+  resolveImageUrl(url?: string): string {
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      return 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80';
+    }
+    const trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+      return trimmed;
+    }
+    const base = environment.apiBaseUrl.replace(/\/api\/?$/, '');
+    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return `${base}${cleanPath}`;
+  }
+
+  async uploadProductImage(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('nisha_admin_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetchWithTimeout(getApiUrl('/files/upload'), {
+      method: 'POST',
+      headers,
+      body: formData
+    }, 25000);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Upload failed (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    if (data.success && data.data?.url) {
+      return this.resolveImageUrl(data.data.url);
+    } else if (data.url) {
+      return this.resolveImageUrl(data.url);
+    }
+    throw new Error('Failed to parse uploaded image URL from server');
+  }
+
   // --- Persistent Storage Helpers ---
   private loadStoredProducts(): Product[] {
     const deleted = this.getDeletedProductIds();
-    if (typeof window === 'undefined') return INITIAL_PRODUCTS.filter(p => !deleted.has(p.id));
+    const demoSkus = new Set(['NPO-GNO-001', 'NPO-VCO-002', 'NPO-SES-003', 'VG-LMP-004', 'VG-LMP-005', 'NPO-CAKE-005', 'NPO-CAS-004']);
+    if (typeof window === 'undefined') return [];
     try {
       const saved = localStorage.getItem(PRODUCTS_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter(p => !deleted.has(p.id));
+          const filtered = parsed.filter(p => !deleted.has(p.id) && !p.id.startsWith('prod-') && !demoSkus.has(p.sku));
+          return filtered;
         }
       }
     } catch (e) {
       console.warn('Failed to load products from local storage:', e);
     }
-    return INITIAL_PRODUCTS.filter(p => !deleted.has(p.id));
+    return [];
   }
 
   private loadStoredCategories(): Category[] {
@@ -342,71 +389,15 @@ export class ProductService {
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         const items = prodData.data?.items || prodData.data;
-        if (Array.isArray(items) && items.length > 0) {
+        if (Array.isArray(items)) {
           const deletedProdIds = this.getDeletedProductIds();
+          const demoSkus = new Set(['NPO-GNO-001', 'NPO-VCO-002', 'NPO-SES-003', 'VG-LMP-004', 'VG-LMP-005', 'NPO-CAKE-005', 'NPO-CAS-004']);
           const liveProds: Product[] = items
-            .filter((p: any) => !deletedProdIds.has(p.id))
-            .map((p: any) => {
-              const rawVariants = p.weightVariants || p.variants;
-              const variants: ProductVariant[] = Array.isArray(rawVariants) 
-                ? rawVariants.map((v: any, idx: number) => ({
-                    id: v.id || `v-${idx}`,
-                    size: (v.code || v.size || v.label || '1L') as VariantSize,
-                    sku: v.sku || `${p.sku || 'NPO'}-${v.code || idx}`,
-                    barcode: v.barcode || '',
-                    mrp: Number(v.mrp || v.price || 0),
-                    sellingPrice: Number(v.sellingPrice || v.discountPrice || v.price || 0),
-                    gstRate: Number(v.gstPercent || v.gstRate || 5),
-                    stockQuantity: Number(v.stockQuantity || v.stock || 50),
-                    reorderLevel: Number(v.reorderLevel || 15),
-                    isEnabled: v.enabled !== false && v.isEnabled !== false
-                  }))
-                : this.createDefaultVariants(p.sku || 'NPO-VAR');
+            .filter((p: any) => !deletedProdIds.has(p.id) && !p.id?.startsWith?.('prod-') && !demoSkus.has(p.sku))
+            .map((p: any) => this.mapDtoToProduct(p));
 
-              const totalStock = p.stock !== undefined && p.stock !== null 
-                ? Number(p.stock) 
-                : variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
-              const prices = variants.filter(v => v.isEnabled).map(v => v.sellingPrice);
-
-              return {
-                id: p.id,
-                name: p.name,
-                brand: p.brand || 'Nisha Pure Oils',
-                category: p.categoryName || (typeof p.category === 'string' ? p.category : (p.category?.name || 'Groundnut Oil')),
-                categoryId: p.categoryId || 'cat-groundnut',
-                sku: p.sku || 'NPO-PROD',
-                barcode: p.barcode || '890123456789',
-                description: p.description || '',
-                benefits: p.benefits ? (Array.isArray(p.benefits) ? p.benefits.join('. ') : p.benefits) : '',
-                ingredients: p.ingredients || '100% Cold Pressed Seeds',
-                storageInstructions: p.storageInstructions || 'Store in cool, dry place away from sunlight',
-                images: p.images && p.images.length > 0 ? p.images : [p.thumbnail || p.primaryImage || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'],
-                primaryImage: p.thumbnail || p.primaryImage || (p.images?.[0] || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'),
-                status: (p.status || (totalStock > 0 ? ProductStatus.ACTIVE : ProductStatus.OUT_OF_STOCK)) as ProductStatus,
-                variants,
-                totalStock,
-                minPrice: prices.length > 0 ? Math.min(...prices) : Number(p.price || 0),
-                maxPrice: prices.length > 0 ? Math.max(...prices) : Number(p.price || 0),
-                createdAt: p.createdAt ? String(p.createdAt).split('T')[0] : '2025-01-01',
-                updatedAt: p.updatedAt ? String(p.updatedAt).split('T')[0] : '2025-01-01'
-              };
-            });
-
-          // Merge: live backend items take precedence; replace dummy mock items by SKU or ID
-          const currentProdMap = new Map(this.productsSignal().map(p => [p.id, p]));
-          const skuToIdMap = new Map(this.productsSignal().map(p => [p.sku, p.id]));
-
-          liveProds.forEach(lp => {
-            if (skuToIdMap.has(lp.sku)) {
-              currentProdMap.delete(skuToIdMap.get(lp.sku)!);
-            }
-            currentProdMap.set(lp.id, lp);
-          });
-          deletedProdIds.forEach(id => currentProdMap.delete(id));
-
-          const mergedProds = Array.from(currentProdMap.values());
-          this.productsSignal.set(mergedProds);
-          this.persistProducts(mergedProds);
+          this.productsSignal.set(liveProds);
+          this.persistProducts(liveProds);
         }
       }
     } catch (err) {
@@ -414,83 +405,211 @@ export class ProductService {
     }
   }
 
+  mapDtoToProduct(p: any): Product {
+    const rawVariants = p.weightVariants || p.variants;
+    const variants: ProductVariant[] = Array.isArray(rawVariants) && rawVariants.length > 0
+      ? rawVariants.map((v: any, idx: number) => ({
+          id: v.id || `v-${idx}`,
+          size: (v.code || v.size || v.label || '1L') as VariantSize,
+          sku: v.sku || `${p.sku || 'NPO'}-${v.code || idx}`,
+          barcode: v.barcode || '',
+          mrp: Number(v.mrp || v.price || 0),
+          sellingPrice: Number(v.sellingPrice || v.discountPrice || v.price || 0),
+          gstRate: Number(v.gstPercent || v.gstRate || 5),
+          stockQuantity: Number(v.stockQuantity || v.stock || 0),
+          reorderLevel: Number(v.reorderLevel || 15),
+          isEnabled: v.enabled !== false && v.isEnabled !== false
+        }))
+      : this.createDefaultVariants(p.sku || 'NPO-VAR');
+
+    const totalStock = p.stock !== undefined && p.stock !== null 
+      ? Number(p.stock) 
+      : variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
+    const prices = variants.filter(v => v.isEnabled).map(v => v.sellingPrice);
+    const mrps = variants.filter(v => v.isEnabled).map(v => v.mrp);
+
+    const primaryImg = this.resolveImageUrl(p.thumbnail || p.primaryImage || (p.images?.[0]));
+    const images = (p.images && p.images.length > 0) 
+      ? p.images.map((img: string) => this.resolveImageUrl(img)) 
+      : [primaryImg];
+
+    return {
+      id: p.id,
+      name: p.name,
+      brand: p.brandName || p.brand || 'Nisha Pure Oils',
+      category: p.categoryName || (typeof p.category === 'string' ? p.category : (p.category?.name || 'Groundnut Oil')),
+      categoryId: p.categoryId || (typeof p.category === 'object' ? p.category?.id : ''),
+      sku: p.sku || 'NPO-PROD',
+      barcode: p.barcode || '890123456789',
+      description: p.description || '',
+      benefits: p.benefits ? (Array.isArray(p.benefits) ? p.benefits.join('. ') : p.benefits) : '',
+      ingredients: p.ingredients || '100% Cold Pressed Seeds',
+      storageInstructions: p.storageInstructions || 'Store in cool, dry place away from sunlight',
+      images,
+      primaryImage: primaryImg,
+      status: (p.status || (totalStock > 0 ? ProductStatus.ACTIVE : ProductStatus.OUT_OF_STOCK)) as ProductStatus,
+      variants,
+      totalStock,
+      minPrice: prices.length > 0 ? Math.min(...prices) : Number(p.price || 0),
+      maxPrice: mrps.length > 0 ? Math.max(...mrps) : Number(p.compareAtPrice || p.price || 0),
+      createdAt: p.createdAt ? String(p.createdAt).split('T')[0] : new Date().toISOString().split('T')[0],
+      updatedAt: p.updatedAt ? String(p.updatedAt).split('T')[0] : new Date().toISOString().split('T')[0]
+    };
+  }
+
   getProductById(id: string): Product | undefined {
     return this.productsSignal().find(p => p.id === id);
   }
 
-  addProduct(productData: Partial<Product>): Product {
-    const variants = productData.variants ?? [];
-    const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
-    const enabledPrices = variants.filter(v => v.isEnabled).map(v => v.sellingPrice);
-    const minPrice = enabledPrices.length > 0 ? Math.min(...enabledPrices) : 0;
-    const maxPrice = enabledPrices.length > 0 ? Math.max(...enabledPrices) : 0;
+  async fetchProductById(id: string): Promise<Product | undefined> {
+    const existing = this.getProductById(id);
+    if (existing) return existing;
 
-    const newProduct: Product = {
-      id: `prod-${Date.now()}`,
-      name: productData.name ?? 'Untitled Product',
-      brand: productData.brand ?? 'Nisha Pure Oils',
-      category: productData.category ?? 'Groundnut Oil',
-      categoryId: productData.categoryId ?? 'cat-groundnut',
-      sku: productData.sku ?? `NPO-SKU-${Math.floor(1000 + Math.random() * 9000)}`,
-      barcode: productData.barcode ?? `8901234${Math.floor(100000 + Math.random() * 900000)}`,
-      description: productData.description ?? '',
-      benefits: productData.benefits ?? '',
-      ingredients: productData.ingredients ?? '',
-      storageInstructions: productData.storageInstructions ?? '',
-      images: productData.images && productData.images.length > 0 ? productData.images : ['https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'],
-      primaryImage: productData.primaryImage ?? (productData.images?.[0] ?? 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'),
-      status: productData.status ?? ProductStatus.ACTIVE,
-      variants,
-      totalStock,
-      minPrice,
-      maxPrice,
-      createdAt: new Date().toISOString().split('T')[0],
-      updatedAt: new Date().toISOString().split('T')[0]
-    };
-
-    this.productsSignal.update(list => {
-      const updated = [newProduct, ...list];
-      this.persistProducts(updated);
-      return updated;
-    });
-
-    // Asynchronously try to create on backend
-    this.sendProductToBackend('POST', '/products', newProduct);
-
-    return newProduct;
+    if (this.isUuid(id)) {
+      try {
+        const res = await this.authenticatedFetch(`/products/${id}`);
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.success && resData.data) {
+            const mapped = this.mapDtoToProduct(resData.data);
+            this.productsSignal.update(list => [mapped, ...list.filter(p => p.id !== id)]);
+            return mapped;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch product from backend:', err);
+      }
+    }
+    return undefined;
   }
 
-  updateProduct(id: string, updates: Partial<Product>): void {
-    this.productsSignal.update(list => {
-      const updated = list.map(p => {
-        if (p.id === id) {
-          const variants = updates.variants ?? p.variants;
-          const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
-          const enabledPrices = variants.filter(v => v.isEnabled).map(v => v.sellingPrice);
-          const minPrice = enabledPrices.length > 0 ? Math.min(...enabledPrices) : p.minPrice;
-          const maxPrice = enabledPrices.length > 0 ? Math.max(...enabledPrices) : p.maxPrice;
+  async addProduct(productData: Partial<Product>): Promise<Product> {
+    return this.saveProduct(productData, false);
+  }
 
-          return {
-            ...p,
-            ...updates,
-            variants,
-            totalStock,
-            minPrice,
-            maxPrice,
-            updatedAt: new Date().toISOString().split('T')[0]
-          };
+  async updateProduct(id: string, updates: Partial<Product>): Promise<Product> {
+    return this.saveProduct(updates, true, id);
+  }
+
+  async saveProduct(productData: Partial<Product>, isEdit: boolean, id?: string): Promise<Product> {
+    const variants = productData.variants ?? [];
+    const enabledVariants = variants.filter(v => v.isEnabled);
+    const prices = enabledVariants.map(v => Number(v.sellingPrice)).filter(p => p > 0);
+    const mrps = enabledVariants.map(v => Number(v.mrp)).filter(p => p > 0);
+
+    const basePrice = prices.length > 0 ? Math.min(...prices) : (Number(productData.minPrice) || 100);
+    const compareAtPrice = mrps.length > 0 ? Math.max(...mrps) : (Number(productData.maxPrice) || Math.round(basePrice * 1.15));
+    const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? Number(v.stockQuantity || 0) : 0), 0);
+
+    // Resolve categoryId to a valid backend UUID
+    let categoryId: string | null = null;
+    const cat = this.categoriesSignal().find(c => 
+      c.id === productData.categoryId || 
+      c.name?.toLowerCase() === productData.category?.toLowerCase() ||
+      c.slug?.toLowerCase() === (productData.category || '').toLowerCase().replace(/\s+/g, '-')
+    );
+    if (cat && this.isUuid(cat.id)) {
+      categoryId = cat.id;
+    } else {
+      const anyUuidCat = this.categoriesSignal().find(c => this.isUuid(c.id));
+      if (anyUuidCat) categoryId = anyUuidCat.id;
+    }
+
+    // Resolve brandId to a valid backend UUID
+    let brandId: string | null = null;
+    const br = this.brandsSignal().find(b => 
+      b.id === (productData as any).brandId || 
+      b.name?.toLowerCase() === productData.brand?.toLowerCase()
+    );
+    if (br && this.isUuid(br.id)) {
+      brandId = br.id;
+    } else {
+      const anyUuidBrand = this.brandsSignal().find(b => this.isUuid(b.id));
+      if (anyUuidBrand) brandId = anyUuidBrand.id;
+    }
+
+    const primaryImage = this.resolveImageUrl(productData.primaryImage || productData.images?.[0]);
+    const images = (productData.images && productData.images.length > 0)
+      ? productData.images.map(img => this.resolveImageUrl(img))
+      : [primaryImage];
+
+    const weightVariants = variants.map((v, idx) => ({
+      code: v.size || `${idx + 1}`,
+      label: `${v.size} ${v.size.toLowerCase().includes('kg') ? 'Pack' : 'Bottle'}`,
+      mrp: Number(v.mrp || v.sellingPrice || basePrice),
+      sellingPrice: Number(v.sellingPrice || basePrice),
+      discountPercent: (v.mrp && v.sellingPrice && Number(v.mrp) > Number(v.sellingPrice)) 
+        ? Math.round(((Number(v.mrp) - Number(v.sellingPrice)) / Number(v.mrp)) * 100) 
+        : 0,
+      gstPercent: Number(v.gstRate ?? 5),
+      sku: v.sku || `${productData.sku || 'NPO'}-${v.size}`,
+      barcode: v.barcode || '',
+      stockQuantity: Number(v.stockQuantity || 0),
+      enabled: v.isEnabled !== false,
+      imageUrl: this.resolveImageUrl(v.imageUrl || v.variantImage || primaryImage)
+    }));
+
+    const backendPayload: any = {
+      name: productData.name?.trim() || 'Untitled Product',
+      description: productData.description?.trim() || productData.name?.trim() || 'Cold-pressed traditional oil',
+      shortDescription: (productData.description || productData.name || '').slice(0, 200),
+      price: basePrice,
+      compareAtPrice: compareAtPrice,
+      sku: (productData.sku || `NPO-${Date.now()}`).toUpperCase().trim(),
+      barcode: productData.barcode || `890100${Date.now().toString().slice(-6)}`,
+      stock: totalStock,
+      lowStockThreshold: 10,
+      images,
+      thumbnail: primaryImage,
+      categoryId,
+      brandId,
+      status: productData.status || ProductStatus.ACTIVE,
+      benefits: productData.benefits
+        ? (Array.isArray(productData.benefits) ? productData.benefits : productData.benefits.split('.').map((s: string) => s.trim()).filter(Boolean))
+        : ['100% Traditional Cold Pressed', 'Unrefined & Natural'],
+      origin: 'Tamil Nadu, India',
+      shelfLife: '12 Months',
+      purity: '100% Cold-Pressed Unrefined',
+      weightVariants
+    };
+
+    let resultProduct: Product;
+
+    try {
+      const url = isEdit && id && this.isUuid(id) ? `/products/${id}` : '/products';
+      const method = isEdit && id && this.isUuid(id) ? 'PUT' : 'POST';
+
+      const res = await this.authenticatedFetch(url, {
+        method,
+        body: JSON.stringify(backendPayload)
+      }, 25000);
+
+      if (res.ok) {
+        const resData = await res.json();
+        if (resData.success && resData.data) {
+          resultProduct = this.mapDtoToProduct(resData.data);
+        } else {
+          throw new Error(resData.message || 'Server rejected product creation');
         }
-        return p;
-      });
+      } else {
+        const errText = await res.text();
+        throw new Error(`Server returned ${res.status}: ${errText}`);
+      }
+    } catch (backendError: any) {
+      console.warn('Backend persistence error:', backendError);
+      throw backendError;
+    }
+
+    // Update signal and local storage
+    this.productsSignal.update(list => {
+      const updated = isEdit && id
+        ? list.map(p => p.id === id ? resultProduct : p)
+        : [resultProduct, ...list.filter(p => p.id !== resultProduct.id)];
       this.persistProducts(updated);
       return updated;
     });
 
-    // Asynchronously try to update on backend
-    const updatedProd = this.getProductById(id);
-    if (updatedProd) {
-      this.sendProductToBackend('PUT', `/products/${id}`, updatedProd);
-    }
+    return resultProduct;
   }
 
   // Stock Management
@@ -507,10 +626,9 @@ export class ProductService {
       return updated;
     });
 
-    // Asynchronously try to update on backend
     const updatedProd = this.getProductById(id);
-    if (updatedProd) {
-      this.sendProductToBackend('PUT', `/products/${id}`, updatedProd);
+    if (updatedProd && this.isUuid(id)) {
+      this.updateProduct(id, updatedProd).catch(e => console.warn('Could not update stock on backend:', e));
     }
   }
 
@@ -761,33 +879,6 @@ export class ProductService {
       });
       this.persistProducts(updated);
       return updated;
-    });
-  }
-
-  private sendProductToBackend(method: 'POST' | 'PUT', path: string, product: Product): void {
-    if (typeof window === 'undefined') return;
-    const token = localStorage.getItem('nisha_admin_token');
-    if (!token) return;
-
-    fetchWithTimeout(getApiUrl(path), {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        name: product.name,
-        brand: product.brand,
-        categoryId: product.categoryId,
-        sku: product.sku,
-        description: product.description,
-        primaryImage: product.primaryImage,
-        images: product.images,
-        status: product.status,
-        variants: product.variants
-      })
-    }, 1500).catch(() => {
-      // Gracefully handled; local state is preserved
     });
   }
 }

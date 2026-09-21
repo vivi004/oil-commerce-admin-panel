@@ -311,9 +311,15 @@ export class ProductFormComponent implements OnInit {
       this.loadProduct(this.editingProductId);
     } else {
       this.initDefaultVariants('NPO-OIL');
-      this.productImages.set([
-        'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'
-      ]);
+      const cats = this.productService.categories();
+      const brands = this.productService.brands();
+      if (cats.length > 0 && !this.productForm.get('category')?.value) {
+        this.productForm.patchValue({ category: cats[0].name });
+      }
+      if (brands.length > 0 && !this.productForm.get('brand')?.value) {
+        this.productForm.patchValue({ brand: brands[0].name });
+      }
+      this.productImages.set([]);
     }
   }
 
@@ -339,8 +345,8 @@ export class ProductFormComponent implements OnInit {
     });
   }
 
-  private loadProduct(id: string): void {
-    const prod = this.productService.getProductById(id);
+  private async loadProduct(id: string): Promise<void> {
+    const prod = await this.productService.fetchProductById(id);
     if (!prod) {
       this.router.navigate(['/tenant-admin/products']);
       return;
@@ -357,7 +363,10 @@ export class ProductFormComponent implements OnInit {
       storageInstructions: prod.storageInstructions
     });
 
-    this.productImages.set(prod.images && prod.images.length > 0 ? prod.images : [prod.primaryImage]);
+    const imgs = prod.images && prod.images.length > 0 
+      ? prod.images.map(img => this.productService.resolveImageUrl(img))
+      : [this.productService.resolveImageUrl(prod.primaryImage)];
+    this.productImages.set(imgs);
 
     this.variantsArray.clear();
     // Map standard sizes and merge existing variant data
@@ -422,7 +431,7 @@ export class ProductFormComponent implements OnInit {
   isSaving = signal<boolean>(false);
   saveSuccess = signal<boolean>(false);
 
-  onSave(): void {
+  async onSave(): Promise<void> {
     if (this.productForm.invalid) {
       this.productForm.markAllAsTouched();
       alert('Please fill all required product fields.');
@@ -431,49 +440,53 @@ export class ProductFormComponent implements OnInit {
 
     this.isSaving.set(true);
 
-    const val = this.productForm.value;
-    const variants: ProductVariant[] = this.variantsArray.value;
-    const images = this.productImages();
-    const primaryImage = images.length > 0 ? images[0] : 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80';
+    try {
+      const val = this.productForm.value;
+      const variants: ProductVariant[] = this.variantsArray.value;
+      const images = this.productImages();
+      const primaryImage = images.length > 0 ? images[0] : 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80';
 
-    if (this.isEditMode() && this.editingProductId) {
-      this.productService.updateProduct(this.editingProductId, {
-        name: val.name,
-        brand: val.brand,
-        category: val.category,
-        sku: val.sku,
-        status: val.status,
-        description: val.description,
-        benefits: val.benefits,
-        storageInstructions: val.storageInstructions,
-        images,
-        primaryImage,
-        variants
-      });
-    } else {
-      this.productService.addProduct({
-        name: val.name,
-        brand: val.brand,
-        category: val.category,
-        categoryId: 'cat-' + val.category.toLowerCase().replace(/\s+/g, '-'),
-        sku: val.sku,
-        barcode: `890100${Date.now().toString().slice(-6)}`,
-        status: val.status,
-        description: val.description,
-        benefits: val.benefits,
-        storageInstructions: val.storageInstructions,
-        images,
-        primaryImage,
-        variants
-      });
+      if (this.isEditMode() && this.editingProductId) {
+        await this.productService.updateProduct(this.editingProductId, {
+          name: val.name,
+          brand: val.brand,
+          category: val.category,
+          sku: val.sku,
+          status: val.status,
+          description: val.description,
+          benefits: val.benefits,
+          storageInstructions: val.storageInstructions,
+          images,
+          primaryImage,
+          variants
+        });
+      } else {
+        await this.productService.addProduct({
+          name: val.name,
+          brand: val.brand,
+          category: val.category,
+          sku: val.sku,
+          barcode: `890100${Date.now().toString().slice(-6)}`,
+          status: val.status,
+          description: val.description,
+          benefits: val.benefits,
+          storageInstructions: val.storageInstructions,
+          images,
+          primaryImage,
+          variants
+        });
+      }
+
+      this.saveSuccess.set(true);
+      setTimeout(() => {
+        this.router.navigate(['/tenant-admin/products']);
+      }, 500);
+    } catch (err: any) {
+      console.error('Failed to save product to database:', err);
+      alert('Failed to save product to database: ' + (err?.message || 'Server error. Please verify backend connection.'));
+    } finally {
+      this.isSaving.set(false);
     }
-
-    this.isSaving.set(false);
-    this.saveSuccess.set(true);
-
-    setTimeout(() => {
-      this.router.navigate(['/tenant-admin/products']);
-    }, 500);
   }
 }
 

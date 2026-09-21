@@ -56,6 +56,7 @@ export interface ProductVariant {
   stockQuantity: number;
   reorderLevel: number;
   variantImage?: string;
+  imageUrl?: string;
   isEnabled: boolean;
 }
 
