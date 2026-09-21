@@ -123,7 +123,7 @@ export class ProductService {
   async syncFromBackend(): Promise<void> {
     try {
       // 1. Sync categories
-      const catRes = await fetchWithTimeout(getApiUrl('/categories'), {}, 2000);
+      const catRes = await fetchWithTimeout(getApiUrl('/categories'), {}, 15000);
       if (catRes.ok) {
         const catData = await catRes.json();
         if (catData.success && Array.isArray(catData.data) && catData.data.length > 0) {
@@ -149,7 +149,7 @@ export class ProductService {
       }
 
       // 2. Sync brands
-      const brandRes = await fetchWithTimeout(getApiUrl('/brands'), {}, 2000);
+      const brandRes = await fetchWithTimeout(getApiUrl('/brands'), {}, 15000);
       if (brandRes.ok) {
         const brandData = await brandRes.json();
         if (brandData.success && Array.isArray(brandData.data) && brandData.data.length > 0) {
@@ -172,35 +172,38 @@ export class ProductService {
       }
 
       // 3. Sync products
-      const prodRes = await fetchWithTimeout(getApiUrl('/products?pageSize=100'), {}, 2000);
+      const prodRes = await fetchWithTimeout(getApiUrl('/products?pageSize=100'), {}, 15000);
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         const items = prodData.data?.items || prodData.data;
         if (Array.isArray(items) && items.length > 0) {
           const liveProds: Product[] = items.map((p: any) => {
-            const variants: ProductVariant[] = Array.isArray(p.variants || p.weightVariants) 
-              ? (p.variants || p.weightVariants).map((v: any, idx: number) => ({
+            const rawVariants = p.weightVariants || p.variants;
+            const variants: ProductVariant[] = Array.isArray(rawVariants) 
+              ? rawVariants.map((v: any, idx: number) => ({
                   id: v.id || `v-${idx}`,
-                  size: (v.size || v.weightCode || '1L') as VariantSize,
-                  sku: v.sku || `${p.sku || 'NPO'}-${v.size || idx}`,
+                  size: (v.code || v.size || v.label || '1L') as VariantSize,
+                  sku: v.sku || `${p.sku || 'NPO'}-${v.code || idx}`,
                   barcode: v.barcode || '',
                   mrp: Number(v.mrp || v.price || 0),
                   sellingPrice: Number(v.sellingPrice || v.discountPrice || v.price || 0),
-                  gstRate: Number(v.gstRate || 5),
+                  gstRate: Number(v.gstPercent || v.gstRate || 5),
                   stockQuantity: Number(v.stockQuantity || v.stock || 50),
                   reorderLevel: Number(v.reorderLevel || 15),
-                  isEnabled: v.isEnabled !== false
+                  isEnabled: v.enabled !== false && v.isEnabled !== false
                 }))
               : this.createDefaultVariants(p.sku || 'NPO-VAR');
 
-            const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
+            const totalStock = p.stock !== undefined && p.stock !== null 
+              ? Number(p.stock) 
+              : variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
             const prices = variants.filter(v => v.isEnabled).map(v => v.sellingPrice);
 
             return {
               id: p.id,
               name: p.name,
               brand: p.brand || 'Nisha Pure Oils',
-              category: typeof p.category === 'string' ? p.category : (p.category?.name || 'Groundnut Oil'),
+              category: p.categoryName || (typeof p.category === 'string' ? p.category : (p.category?.name || 'Groundnut Oil')),
               categoryId: p.categoryId || 'cat-groundnut',
               sku: p.sku || 'NPO-PROD',
               barcode: p.barcode || '890123456789',
@@ -208,26 +211,29 @@ export class ProductService {
               benefits: p.benefits ? (Array.isArray(p.benefits) ? p.benefits.join('. ') : p.benefits) : '',
               ingredients: p.ingredients || '100% Cold Pressed Seeds',
               storageInstructions: p.storageInstructions || 'Store in cool, dry place away from sunlight',
-              images: p.images && p.images.length > 0 ? p.images : [p.primaryImage || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'],
-              primaryImage: p.primaryImage || (p.images?.[0] || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'),
+              images: p.images && p.images.length > 0 ? p.images : [p.thumbnail || p.primaryImage || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'],
+              primaryImage: p.thumbnail || p.primaryImage || (p.images?.[0] || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80'),
               status: (p.status || (totalStock > 0 ? ProductStatus.ACTIVE : ProductStatus.OUT_OF_STOCK)) as ProductStatus,
               variants,
               totalStock,
-              minPrice: prices.length > 0 ? Math.min(...prices) : Number(p.basePrice || 0),
-              maxPrice: prices.length > 0 ? Math.max(...prices) : Number(p.basePrice || 0),
+              minPrice: prices.length > 0 ? Math.min(...prices) : Number(p.price || 0),
+              maxPrice: prices.length > 0 ? Math.max(...prices) : Number(p.price || 0),
               createdAt: p.createdAt ? String(p.createdAt).split('T')[0] : '2025-01-01',
               updatedAt: p.updatedAt ? String(p.updatedAt).split('T')[0] : '2025-01-01'
             };
           });
 
-          // Keep user's locally edited products, updating only backend-tracked products
+          // Merge: live backend items take precedence; replace dummy mock items by SKU or ID
           const currentProdMap = new Map(this.productsSignal().map(p => [p.id, p]));
+          const skuToIdMap = new Map(this.productsSignal().map(p => [p.sku, p.id]));
+
           liveProds.forEach(lp => {
-            // If user hasn't edited this product locally (or it's a new backend item), accept backend
-            if (!currentProdMap.has(lp.id)) {
-              currentProdMap.set(lp.id, lp);
+            if (skuToIdMap.has(lp.sku)) {
+              currentProdMap.delete(skuToIdMap.get(lp.sku)!);
             }
+            currentProdMap.set(lp.id, lp);
           });
+
           const mergedProds = Array.from(currentProdMap.values());
           this.productsSignal.set(mergedProds);
           this.persistProducts(mergedProds);
