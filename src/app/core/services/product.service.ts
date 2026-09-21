@@ -5,13 +5,17 @@ import { ProductStatus } from '../enums/app.enums';
 import { fetchWithTimeout, getApiUrl } from '../utils/api.utils';
 import { environment } from '../../../environments/environment';
 
+const PRODUCTS_STORAGE_KEY = 'nisha_admin_products_v1';
+const CATEGORIES_STORAGE_KEY = 'nisha_admin_categories_v1';
+const BRANDS_STORAGE_KEY = 'nisha_admin_brands_v1';
+
 @Injectable({
   providedIn: 'root'
 })
 export class ProductService {
-  private readonly productsSignal = signal<Product[]>(INITIAL_PRODUCTS);
-  private readonly categoriesSignal = signal<Category[]>(INITIAL_CATEGORIES);
-  private readonly brandsSignal = signal<Brand[]>(INITIAL_BRANDS);
+  private readonly productsSignal = signal<Product[]>(this.loadStoredProducts());
+  private readonly categoriesSignal = signal<Category[]>(this.loadStoredCategories());
+  private readonly brandsSignal = signal<Brand[]>(this.loadStoredBrands());
 
   readonly storefrontUrl: string = (environment as any).storefrontUrl || 'http://localhost:4200';
 
@@ -27,6 +31,85 @@ export class ProductService {
 
   constructor() {
     this.syncFromBackend();
+  }
+
+  // --- Persistent Storage Helpers ---
+  private loadStoredProducts(): Product[] {
+    if (typeof window === 'undefined') return INITIAL_PRODUCTS;
+    try {
+      const saved = localStorage.getItem(PRODUCTS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load products from local storage:', e);
+    }
+    return INITIAL_PRODUCTS;
+  }
+
+  private loadStoredCategories(): Category[] {
+    if (typeof window === 'undefined') return INITIAL_CATEGORIES;
+    try {
+      const saved = localStorage.getItem(CATEGORIES_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load categories from local storage:', e);
+    }
+    return INITIAL_CATEGORIES;
+  }
+
+  private loadStoredBrands(): Brand[] {
+    if (typeof window === 'undefined') return INITIAL_BRANDS;
+    try {
+      const saved = localStorage.getItem(BRANDS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load brands from local storage:', e);
+    }
+    return INITIAL_BRANDS;
+  }
+
+  private persistProducts(products: Product[]): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
+      } catch (e) {
+        console.warn('Failed to persist products to local storage:', e);
+      }
+    }
+  }
+
+  private persistCategories(categories: Category[]): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+      } catch (e) {
+        console.warn('Failed to persist categories to local storage:', e);
+      }
+    }
+  }
+
+  private persistBrands(brands: Brand[]): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(BRANDS_STORAGE_KEY, JSON.stringify(brands));
+      } catch (e) {
+        console.warn('Failed to persist brands to local storage:', e);
+      }
+    }
   }
 
   getStorefrontProductUrl(idOrSlug: string): string {
@@ -55,7 +138,13 @@ export class ProductService {
             seoTitle: c.seoTitle || c.name,
             seoDescription: c.seoDescription || c.description
           }));
-          this.categoriesSignal.set(liveCats);
+
+          // Merge without losing locally added categories
+          const currentMap = new Map(this.categoriesSignal().map(c => [c.id, c]));
+          liveCats.forEach(lc => currentMap.set(lc.id, lc));
+          const mergedCats = Array.from(currentMap.values());
+          this.categoriesSignal.set(mergedCats);
+          this.persistCategories(mergedCats);
         }
       }
 
@@ -72,7 +161,13 @@ export class ProductService {
             isActive: b.isActive !== false,
             productCount: b.productCount || 0
           }));
-          this.brandsSignal.set(liveBrands);
+
+          // Merge without losing locally added brands
+          const currentBrandMap = new Map(this.brandsSignal().map(b => [b.id, b]));
+          liveBrands.forEach(lb => currentBrandMap.set(lb.id, lb));
+          const mergedBrands = Array.from(currentBrandMap.values());
+          this.brandsSignal.set(mergedBrands);
+          this.persistBrands(mergedBrands);
         }
       }
 
@@ -124,14 +219,24 @@ export class ProductService {
               updatedAt: p.updatedAt ? String(p.updatedAt).split('T')[0] : '2025-01-01'
             };
           });
-          this.productsSignal.set(liveProds);
+
+          // Keep user's locally edited products, updating only backend-tracked products
+          const currentProdMap = new Map(this.productsSignal().map(p => [p.id, p]));
+          liveProds.forEach(lp => {
+            // If user hasn't edited this product locally (or it's a new backend item), accept backend
+            if (!currentProdMap.has(lp.id)) {
+              currentProdMap.set(lp.id, lp);
+            }
+          });
+          const mergedProds = Array.from(currentProdMap.values());
+          this.productsSignal.set(mergedProds);
+          this.persistProducts(mergedProds);
         }
       }
     } catch (err) {
-      console.warn('Could not sync products/categories from backend, using current state:', err);
+      console.warn('Could not sync products/categories from backend, using persisted state:', err);
     }
   }
-
 
   getProductById(id: string): Product | undefined {
     return this.productsSignal().find(p => p.id === id);
@@ -167,35 +272,69 @@ export class ProductService {
       updatedAt: new Date().toISOString().split('T')[0]
     };
 
-    this.productsSignal.update(list => [newProduct, ...list]);
+    this.productsSignal.update(list => {
+      const updated = [newProduct, ...list];
+      this.persistProducts(updated);
+      return updated;
+    });
+
+    // Asynchronously try to create on backend
+    this.sendProductToBackend('POST', '/products', newProduct);
+
     return newProduct;
   }
 
   updateProduct(id: string, updates: Partial<Product>): void {
-    this.productsSignal.update(list => list.map(p => {
-      if (p.id === id) {
-        const variants = updates.variants ?? p.variants;
-        const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
-        const enabledPrices = variants.filter(v => v.isEnabled).map(v => v.sellingPrice);
-        const minPrice = enabledPrices.length > 0 ? Math.min(...enabledPrices) : p.minPrice;
-        const maxPrice = enabledPrices.length > 0 ? Math.max(...enabledPrices) : p.maxPrice;
+    this.productsSignal.update(list => {
+      const updated = list.map(p => {
+        if (p.id === id) {
+          const variants = updates.variants ?? p.variants;
+          const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
+          const enabledPrices = variants.filter(v => v.isEnabled).map(v => v.sellingPrice);
+          const minPrice = enabledPrices.length > 0 ? Math.min(...enabledPrices) : p.minPrice;
+          const maxPrice = enabledPrices.length > 0 ? Math.max(...enabledPrices) : p.maxPrice;
 
-        return {
-          ...p,
-          ...updates,
-          variants,
-          totalStock,
-          minPrice,
-          maxPrice,
-          updatedAt: new Date().toISOString().split('T')[0]
-        };
-      }
-      return p;
-    }));
+          return {
+            ...p,
+            ...updates,
+            variants,
+            totalStock,
+            minPrice,
+            maxPrice,
+            updatedAt: new Date().toISOString().split('T')[0]
+          };
+        }
+        return p;
+      });
+      this.persistProducts(updated);
+      return updated;
+    });
+
+    // Asynchronously try to update on backend
+    const updatedProd = this.getProductById(id);
+    if (updatedProd) {
+      this.sendProductToBackend('PUT', `/products/${id}`, updatedProd);
+    }
   }
 
   deleteProduct(id: string): void {
-    this.productsSignal.update(list => list.filter(p => p.id !== id));
+    this.productsSignal.update(list => {
+      const updated = list.filter(p => p.id !== id);
+      this.persistProducts(updated);
+      return updated;
+    });
+
+    // Asynchronously delete on backend if UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid) {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('nisha_admin_token') : null;
+      if (token) {
+        fetchWithTimeout(getApiUrl(`/products/${id}`), {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        }, 1500).catch(() => {});
+      }
+    }
   }
 
   // Categories
@@ -211,15 +350,27 @@ export class ProductService {
       isActive: true,
       productCount: 0
     };
-    this.categoriesSignal.update(list => [newCat, ...list]);
+    this.categoriesSignal.update(list => {
+      const updated = [newCat, ...list];
+      this.persistCategories(updated);
+      return updated;
+    });
   }
 
   updateCategory(id: string, updates: Partial<Category>): void {
-    this.categoriesSignal.update(list => list.map(c => c.id === id ? { ...c, ...updates } : c));
+    this.categoriesSignal.update(list => {
+      const updated = list.map(c => c.id === id ? { ...c, ...updates } : c);
+      this.persistCategories(updated);
+      return updated;
+    });
   }
 
   deleteCategory(id: string): void {
-    this.categoriesSignal.update(list => list.filter(c => c.id !== id));
+    this.categoriesSignal.update(list => {
+      const updated = list.filter(c => c.id !== id);
+      this.persistCategories(updated);
+      return updated;
+    });
   }
 
   // Brands
@@ -232,15 +383,27 @@ export class ProductService {
       isActive: true,
       productCount: 0
     };
-    this.brandsSignal.update(list => [newBrand, ...list]);
+    this.brandsSignal.update(list => {
+      const updated = [newBrand, ...list];
+      this.persistBrands(updated);
+      return updated;
+    });
   }
 
   updateBrand(id: string, updates: Partial<Brand>): void {
-    this.brandsSignal.update(list => list.map(b => b.id === id ? { ...b, ...updates } : b));
+    this.brandsSignal.update(list => {
+      const updated = list.map(b => b.id === id ? { ...b, ...updates } : b);
+      this.persistBrands(updated);
+      return updated;
+    });
   }
 
   deleteBrand(id: string): void {
-    this.brandsSignal.update(list => list.filter(b => b.id !== id));
+    this.brandsSignal.update(list => {
+      const updated = list.filter(b => b.id !== id);
+      this.persistBrands(updated);
+      return updated;
+    });
   }
 
   // Helper for generating standard variant templates
@@ -256,32 +419,67 @@ export class ProductService {
       gstRate: 5,
       stockQuantity: 50,
       reorderLevel: 15,
-      isEnabled: ['200ml', '500ml', '1L', '5L'].includes(size) // enable popular variants by default
+      isEnabled: ['200ml', '500ml', '1L', '5L'].includes(size)
     }));
   }
 
   updateVariantStock(productId: string, sku: string, newStock: number): void {
-    this.productsSignal.update(products => products.map(p => {
-      if (p.id === productId) {
-        const variants = p.variants.map(v => v.sku === sku ? { ...v, stockQuantity: newStock } : v);
-        const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
-        return { ...p, variants, totalStock, updatedAt: new Date().toISOString().split('T')[0] };
-      }
-      return p;
-    }));
+    this.productsSignal.update(products => {
+      const updated = products.map(p => {
+        if (p.id === productId) {
+          const variants = p.variants.map(v => v.sku === sku ? { ...v, stockQuantity: newStock } : v);
+          const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
+          return { ...p, variants, totalStock, updatedAt: new Date().toISOString().split('T')[0] };
+        }
+        return p;
+      });
+      this.persistProducts(updated);
+      return updated;
+    });
   }
 
   updateVariantPriceAndStock(productId: string, sku: string, sellingPrice: number, mrp: number, stock: number): void {
-    this.productsSignal.update(products => products.map(p => {
-      if (p.id === productId) {
-        const variants = p.variants.map(v => v.sku === sku ? { ...v, sellingPrice, mrp, stockQuantity: stock } : v);
-        const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
-        const enabledPrices = variants.filter(v => v.isEnabled).map(v => v.sellingPrice);
-        const minPrice = enabledPrices.length > 0 ? Math.min(...enabledPrices) : p.minPrice;
-        const maxPrice = enabledPrices.length > 0 ? Math.max(...enabledPrices) : p.maxPrice;
-        return { ...p, variants, totalStock, minPrice, maxPrice, updatedAt: new Date().toISOString().split('T')[0] };
-      }
-      return p;
-    }));
+    this.productsSignal.update(products => {
+      const updated = products.map(p => {
+        if (p.id === productId) {
+          const variants = p.variants.map(v => v.sku === sku ? { ...v, sellingPrice, mrp, stockQuantity: stock } : v);
+          const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? v.stockQuantity : 0), 0);
+          const enabledPrices = variants.filter(v => v.isEnabled).map(v => v.sellingPrice);
+          const minPrice = enabledPrices.length > 0 ? Math.min(...enabledPrices) : p.minPrice;
+          const maxPrice = enabledPrices.length > 0 ? Math.max(...enabledPrices) : p.maxPrice;
+          return { ...p, variants, totalStock, minPrice, maxPrice, updatedAt: new Date().toISOString().split('T')[0] };
+        }
+        return p;
+      });
+      this.persistProducts(updated);
+      return updated;
+    });
+  }
+
+  private sendProductToBackend(method: 'POST' | 'PUT', path: string, product: Product): void {
+    if (typeof window === 'undefined') return;
+    const token = localStorage.getItem('nisha_admin_token');
+    if (!token) return;
+
+    fetchWithTimeout(getApiUrl(path), {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        name: product.name,
+        brand: product.brand,
+        categoryId: product.categoryId,
+        sku: product.sku,
+        description: product.description,
+        primaryImage: product.primaryImage,
+        images: product.images,
+        status: product.status,
+        variants: product.variants
+      })
+    }, 1500).catch(() => {
+      // Gracefully handled; local state is preserved
+    });
   }
 }

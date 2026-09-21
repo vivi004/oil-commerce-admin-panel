@@ -3,6 +3,7 @@ import { StockMovement, VariantSize } from '../models/app.models';
 import { StockMovementType } from '../enums/app.enums';
 import { INITIAL_STOCK_MOVEMENTS } from './mock-data';
 import { ProductService } from './product.service';
+import { fetchWithTimeout, getApiUrl } from '../utils/api.utils';
 
 export interface StockInventoryItem {
   productId: string;
@@ -21,15 +22,77 @@ export interface StockInventoryItem {
   status: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
 }
 
+const MOVEMENTS_STORAGE_KEY = 'nisha_admin_movements_v1';
+
 @Injectable({
   providedIn: 'root'
 })
 export class InventoryService {
-  private movementsSignal = signal<StockMovement[]>(INITIAL_STOCK_MOVEMENTS);
+  private movementsSignal = signal<StockMovement[]>(this.loadInitialMovements());
 
   readonly movements = this.movementsSignal.asReadonly();
 
-  constructor(private productService: ProductService) {}
+  constructor(private productService: ProductService) {
+    this.syncMovementsFromBackend();
+  }
+
+  private async syncMovementsFromBackend(): Promise<void> {
+    try {
+      const res = await fetchWithTimeout(getApiUrl('/inventory/movements'));
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+          const mapped: StockMovement[] = result.data.map((m: any) => ({
+            id: m.id,
+            productId: m.productId,
+            productName: m.productName,
+            sku: m.sku,
+            variantSize: m.variantSize,
+            type: m.type as StockMovementType,
+            quantity: m.quantity,
+            previousStock: m.previousStock,
+            newStock: m.newStock,
+            warehouseLocation: m.warehouseLocation,
+            reason: m.reason,
+            referenceId: m.referenceId,
+            performedBy: m.performedBy,
+            createdAt: m.createdAt
+          }));
+          this.movementsSignal.set(mapped);
+          this.persistMovements(mapped);
+        }
+      }
+    } catch (e) {
+      console.warn('Backend /inventory/movements offline, relying on cached data:', e);
+    }
+  }
+
+  private loadInitialMovements(): StockMovement[] {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(MOVEMENTS_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load stock movements from localStorage:', e);
+      }
+    }
+    return INITIAL_STOCK_MOVEMENTS;
+  }
+
+  private persistMovements(movements: StockMovement[]): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(MOVEMENTS_STORAGE_KEY, JSON.stringify(movements));
+      } catch (e) {
+        console.warn('Failed to persist stock movements to localStorage:', e);
+      }
+    }
+  }
 
   // Computed signals
   readonly totalMovementsCount = computed(() => this.movementsSignal().length);
@@ -70,7 +133,6 @@ export class InventoryService {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 15);
   });
-
 
   // Calculate low stock variants across all products
   readonly lowStockVariants = computed(() => {
@@ -151,6 +213,25 @@ export class InventoryService {
       createdAt: new Date().toISOString()
     };
 
-    this.movementsSignal.update(movements => [newMovement, ...movements]);
+    this.movementsSignal.update(movements => {
+      const updated = [newMovement, ...movements];
+      this.persistMovements(updated);
+      return updated;
+    });
+
+    fetchWithTimeout(getApiUrl('/inventory/adjust'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId: params.productId,
+        sku: params.sku,
+        type: params.type,
+        quantityChange: params.quantityChange,
+        warehouseLocation: params.warehouseLocation,
+        reason: params.reason,
+        performedBy: params.performedBy,
+        referenceId: newMovement.referenceId
+      })
+    }).catch(e => console.warn('Async backend inventory adjustment failed:', e));
   }
 }

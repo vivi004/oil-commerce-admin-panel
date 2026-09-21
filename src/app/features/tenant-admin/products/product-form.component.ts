@@ -40,10 +40,11 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
           <button
             type="button"
             (click)="onSave()"
-            class="flex-1 sm:flex-initial justify-center px-5 py-2 text-xs font-semibold rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20 transition-all flex items-center gap-1.5"
+            [disabled]="isSaving()"
+            class="flex-1 sm:flex-initial justify-center px-5 py-2 text-xs font-semibold rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50"
           >
-            <span class="material-symbols-outlined text-[18px]">save</span>
-            <span>{{ isEditMode() ? 'Update Product' : 'Publish Product' }}</span>
+            <span class="material-symbols-outlined text-[18px]">{{ isSaving() ? 'sync' : saveSuccess() ? 'check' : 'save' }}</span>
+            <span>{{ isSaving() ? 'Saving...' : saveSuccess() ? 'Saved!' : (isEditMode() ? 'Update Product' : 'Publish Product') }}</span>
           </button>
         </div>
       </div>
@@ -418,12 +419,17 @@ export class ProductFormComponent implements OnInit {
     this.productImages.set(imgs);
   }
 
+  isSaving = signal<boolean>(false);
+  saveSuccess = signal<boolean>(false);
+
   onSave(): void {
     if (this.productForm.invalid) {
       this.productForm.markAllAsTouched();
       alert('Please fill all required product fields.');
       return;
     }
+
+    this.isSaving.set(true);
 
     const val = this.productForm.value;
     const variants: ProductVariant[] = this.variantsArray.value;
@@ -462,6 +468,12 @@ export class ProductFormComponent implements OnInit {
       });
     }
 
-    this.router.navigate(['/tenant-admin/products']);
+    this.isSaving.set(false);
+    this.saveSuccess.set(true);
+
+    setTimeout(() => {
+      this.router.navigate(['/tenant-admin/products']);
+    }, 500);
   }
 }
+

@@ -4,11 +4,13 @@ import { OrderStatus } from '../enums/app.enums';
 import { INITIAL_ORDERS } from './mock-data';
 import { fetchWithTimeout, getApiUrl } from '../utils/api.utils';
 
+const ORDERS_STORAGE_KEY = 'nisha_admin_orders_v1';
+
 @Injectable({
   providedIn: 'root'
 })
 export class OrderService {
-  private ordersSignal = signal<Order[]>(INITIAL_ORDERS);
+  private ordersSignal = signal<Order[]>(this.loadInitialOrders());
   private isFetching = false;
 
   // Expose readable signal
@@ -40,7 +42,64 @@ export class OrderService {
     if (typeof window !== 'undefined') {
       setInterval(() => {
         this.fetchOrdersFromBackend();
+        this.syncFromStorefrontStorage();
       }, 10000);
+    }
+  }
+
+  private loadInitialOrders(): Order[] {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(ORDERS_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load orders from localStorage:', e);
+      }
+    }
+    return INITIAL_ORDERS;
+  }
+
+  private persistOrders(orders: Order[]): void {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+      } catch (e) {
+        console.warn('Failed to persist orders to localStorage:', e);
+      }
+    }
+  }
+
+  private syncFromStorefrontStorage(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const sfOrdersRaw = localStorage.getItem('shopzone_orders_list');
+      if (sfOrdersRaw) {
+        const sfOrders = JSON.parse(sfOrdersRaw);
+        if (Array.isArray(sfOrders) && sfOrders.length > 0) {
+          const currentOrders = this.ordersSignal();
+          const currentIds = new Set(currentOrders.map(o => o.id));
+          const newOrdersFromSf: Order[] = [];
+
+          for (const sfo of sfOrders) {
+            if (!currentIds.has(sfo.id)) {
+              newOrdersFromSf.push(this.mapDtoToOrder(sfo));
+            }
+          }
+
+          if (newOrdersFromSf.length > 0) {
+            const merged = [...newOrdersFromSf, ...currentOrders];
+            this.ordersSignal.set(merged);
+            this.persistOrders(merged);
+          }
+        }
+      }
+    } catch {
+      // Ignore cross-app sync parse errors
     }
   }
 
@@ -87,14 +146,17 @@ export class OrderService {
         if (json.success && json.data?.items) {
           const backendOrders: Order[] = json.data.items.map((dto: any) => this.mapDtoToOrder(dto));
           
-          // Merge backend orders with mock orders (backend orders placed on top)
+          // Merge backend orders with existing orders (backend orders placed on top)
+          const currentOrders = this.ordersSignal();
           const backendIds = new Set(backendOrders.map(o => o.id));
-          const remainingMock = INITIAL_ORDERS.filter(o => !backendIds.has(o.id));
-          this.ordersSignal.set([...backendOrders, ...remainingMock]);
+          const remainingLocal = currentOrders.filter(o => !backendIds.has(o.id));
+          const merged = [...backendOrders, ...remainingLocal];
+          this.ordersSignal.set(merged);
+          this.persistOrders(merged);
         }
       }
     } catch (e) {
-      console.warn('Could not sync orders from backend, relying on cached/initial orders', e);
+      console.warn('Could not sync orders from backend, relying on cached/local orders', e);
     } finally {
       this.isFetching = false;
     }
@@ -156,9 +218,9 @@ export class OrderService {
   }
 
   async updateOrderStatus(orderId: string, status: OrderStatus, trackingNumber?: string, carrier?: string): Promise<void> {
-    // 1. Optimistic local update
-    this.ordersSignal.update(orders => 
-      orders.map(o => {
+    // 1. Optimistic local update with persistence
+    this.ordersSignal.update(orders => {
+      const updated = orders.map(o => {
         if (o.id === orderId) {
           return {
             ...o,
@@ -169,8 +231,10 @@ export class OrderService {
           };
         }
         return o;
-      })
-    );
+      });
+      this.persistOrders(updated);
+      return updated;
+    });
 
     // 2. Sync to backend if order is a UUID
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
@@ -199,9 +263,11 @@ export class OrderService {
   }
 
   updatePaymentStatus(orderId: string, paymentStatus: 'PAID' | 'PENDING' | 'REFUNDED' | 'FAILED'): void {
-    this.ordersSignal.update(orders => 
-      orders.map(o => o.id === orderId ? { ...o, paymentStatus, updatedAt: new Date().toISOString() } : o)
-    );
+    this.ordersSignal.update(orders => {
+      const updated = orders.map(o => o.id === orderId ? { ...o, paymentStatus, updatedAt: new Date().toISOString() } : o);
+      this.persistOrders(updated);
+      return updated;
+    });
   }
 
   addOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'>): Order {
@@ -211,7 +277,11 @@ export class OrderService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    this.ordersSignal.update(orders => [newOrder, ...orders]);
+    this.ordersSignal.update(orders => {
+      const updated = [newOrder, ...orders];
+      this.persistOrders(updated);
+      return updated;
+    });
     return newOrder;
   }
 }
