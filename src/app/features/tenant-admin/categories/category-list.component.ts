@@ -345,7 +345,7 @@ export class CategoryListComponent {
     this.isModalOpen.set(true);
   }
 
-  saveCategory(): void {
+  async saveCategory(): Promise<void> {
     if (this.catForm.invalid) {
       this.catForm.markAllAsTouched();
       return;
@@ -353,9 +353,9 @@ export class CategoryListComponent {
 
     const val = this.catForm.value;
     if (this.isEditing() && this.selectedCategory()) {
-      this.productService.updateCategory(this.selectedCategory()!.id, val);
+      await this.productService.updateCategory(this.selectedCategory()!.id, val);
     } else {
-      this.productService.addCategory(val);
+      await this.productService.addCategory(val);
     }
 
     this.isModalOpen.set(false);
@@ -366,10 +366,10 @@ export class CategoryListComponent {
     this.isDeleteDialogOpen.set(true);
   }
 
-  executeDelete(): void {
+  async executeDelete(): Promise<void> {
     const c = this.selectedCategory();
     if (c) {
-      this.productService.deleteCategory(c.id);
+      await this.productService.deleteCategory(c.id);
     }
     this.isDeleteDialogOpen.set(false);
   }

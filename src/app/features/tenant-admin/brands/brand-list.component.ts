@@ -331,7 +331,7 @@ export class BrandListComponent {
     this.isModalOpen.set(true);
   }
 
-  saveBrand(): void {
+  async saveBrand(): Promise<void> {
     if (this.brandForm.invalid) {
       this.brandForm.markAllAsTouched();
       return;
@@ -339,9 +339,9 @@ export class BrandListComponent {
 
     const val = this.brandForm.value;
     if (this.isEditing() && this.selectedBrand()) {
-      this.productService.updateBrand(this.selectedBrand()!.id, val);
+      await this.productService.updateBrand(this.selectedBrand()!.id, val);
     } else {
-      this.productService.addBrand(val);
+      await this.productService.addBrand(val);
     }
 
     this.isModalOpen.set(false);
@@ -352,10 +352,10 @@ export class BrandListComponent {
     this.isDeleteDialogOpen.set(true);
   }
 
-  executeDelete(): void {
+  async executeDelete(): Promise<void> {
     const b = this.selectedBrand();
     if (b) {
-      this.productService.deleteBrand(b.id);
+      await this.productService.deleteBrand(b.id);
     }
     this.isDeleteDialogOpen.set(false);
   }
