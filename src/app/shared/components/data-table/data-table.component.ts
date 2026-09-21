@@ -20,7 +20,7 @@ export interface ColumnDef {
       <!-- Toolbar: Search & Action Buttons -->
       <div *ngIf="showToolbar" class="p-3 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <!-- Search Input -->
-        <div class="relative w-full sm:w-72">
+        <div class="relative w-full sm:w-80 md:w-96">
           <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">
             search
           </span>

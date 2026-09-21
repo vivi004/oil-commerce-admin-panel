@@ -328,7 +328,7 @@ export class AdminLayoutComponent {
           items: [
             { label: 'All Customer Orders', route: '/tenant-admin/orders', icon: 'receipt_long', badge: 'Live' },
             { label: 'Registered Customers', route: '/tenant-admin/customers', icon: 'groups' },
-            { label: 'Tenant Admin View', route: '/tenant-admin/dashboard', icon: 'store', badge: 'Switch' }
+            { label: 'Tenant Admin', route: '/tenant-admin/dashboard', icon: 'store', badge: 'Switch' }
           ]
         }
       ];
