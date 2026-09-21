@@ -131,7 +131,7 @@ export class ProductService {
     };
 
     let res = await fetchWithTimeout(getApiUrl(path), mergedOptions, timeoutMs);
-    if (res.status === 401 && typeof window !== 'undefined') {
+    if ((res.status === 401 || res.status === 403) && typeof window !== 'undefined') {
       localStorage.removeItem('nisha_admin_token');
       authHeader = await this.getAdminAuthHeader();
       mergedOptions.headers = {
