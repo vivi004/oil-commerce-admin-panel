@@ -1,6 +1,6 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { INITIAL_PAYMENTS } from '../../../core/services/mock-data';
+import { OrderService } from '../../../core/services/order.service';
 import { PaymentTransaction } from '../../../core/models/app.models';
 import { DataTableComponent, ColumnDef } from '../../../shared/components/data-table/data-table.component';
 import { BadgeComponent } from '../../../shared/components/badge/badge.component';
@@ -66,7 +66,22 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
   `
 })
 export class PaymentListComponent {
-  payments = signal<PaymentTransaction[]>(INITIAL_PAYMENTS);
+  private orderService = inject(OrderService);
+
+  payments = computed<PaymentTransaction[]>(() => {
+    return this.orderService.orders().map(o => ({
+      id: `pay-${o.id}`,
+      orderId: o.id,
+      orderNumber: o.orderNumber,
+      customerName: o.customerName || 'Store Customer',
+      amount: o.grandTotal,
+      paymentMethod: o.paymentMethod || 'Online Payment',
+      gatewayTransactionId: o.trackingNumber || `txn_${o.id}`,
+      status: o.paymentStatus === 'PAID' ? 'SUCCESS' : o.paymentStatus === 'FAILED' ? 'FAILED' : 'PENDING',
+      settlementStatus: o.paymentStatus === 'PAID' ? 'SETTLED' : 'PENDING',
+      createdAt: o.createdAt
+    }));
+  });
   searchQuery = signal<string>('');
 
   columns: ColumnDef[] = [

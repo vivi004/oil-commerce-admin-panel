@@ -1,6 +1,5 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Customer, Order } from '../models/app.models';
-import { INITIAL_CUSTOMERS } from './mock-data';
 import { OrderService } from './order.service';
 import { fetchWithTimeout, getApiUrl } from '../utils/api.utils';
 import { environment } from '../../../environments/environment';
@@ -8,39 +7,15 @@ import { environment } from '../../../environments/environment';
 const CUSTOMERS_STORAGE_KEY = 'nisha_admin_customers_v2';
 const DELETED_CUSTOMERS_STORAGE_KEY = 'nisha_admin_deleted_customers_v2';
 
-const EXTENDED_SEED_CUSTOMERS: Customer[] = [
-  ...INITIAL_CUSTOMERS,
-  {
-    id: 'cust-4',
-    fullName: 'Kavitha Sundaram',
-    email: 'kavitha.s@gmail.com',
-    phone: '+91 98421 88442',
-    address: '42, Cross Cut Road, Gandhipuram',
-    city: 'Coimbatore',
-    state: 'Tamil Nadu',
-    pincode: '641012',
-    totalOrders: 2,
-    lifetimeSpend: 2672.50,
-    lastOrderDate: '2026-03-16',
-    supportNotes: 'Prefers 5L tin packaging for groundnut oil and 1L cold-pressed virgin coconut oil.',
-    createdAt: '2025-01-15'
-  },
-  {
-    id: 'cust-5',
-    fullName: 'Suresh Balaji',
-    email: 'suresh.b@gmail.com',
-    phone: '+91 98422 33445',
-    address: '108, West Veli Street',
-    city: 'Madurai',
-    state: 'Tamil Nadu',
-    pincode: '625001',
-    totalOrders: 4,
-    lifetimeSpend: 6850,
-    lastOrderDate: '2026-03-10',
-    supportNotes: 'Regular monthly order of wood-pressed gingelly / sesame oil.',
-    createdAt: '2025-02-01'
-  }
-];
+export const DEMO_CUSTOMER_EMAILS = new Set([
+  'anand.p@gmail.com',
+  'deepa.m@yahoo.com',
+  'karthik.sub@outlook.com',
+  'kavitha.s@gmail.com',
+  'suresh.b@gmail.com'
+]);
+
+export const DEMO_CUSTOMER_IDS = new Set(['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5']);
 
 @Injectable({
   providedIn: 'root'
@@ -134,32 +109,34 @@ export class CustomerService {
     const deleted = this.loadDeletedRecords();
 
     if (typeof window === 'undefined') {
-      return EXTENDED_SEED_CUSTOMERS.filter(
-        c => !deleted.emails.has(c.email.toLowerCase().trim()) && !deleted.ids.has(c.id)
-      );
+      return [];
     }
 
     try {
-      const stored = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
-      // If user previously saved anything (even an empty array [] or 1 single customer), respect it!
+      let stored = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
+      if (!stored) {
+        stored = localStorage.getItem('nisha_admin_customers_v1');
+      }
+
       if (stored !== null) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          return parsed.filter(
-            c => !deleted.emails.has(c.email?.toLowerCase().trim()) && !deleted.ids.has(c.id)
-          );
+          // Retain only authentic customer accounts, exclude all mock/demo data and deleted tombstones
+          const clean = parsed.filter(c => {
+            const emailKey = (c.email || '').toLowerCase().trim();
+            const isDemo = DEMO_CUSTOMER_EMAILS.has(emailKey) || DEMO_CUSTOMER_IDS.has(c.id);
+            const isDeleted = deleted.emails.has(emailKey) || deleted.ids.has(c.id);
+            return !isDemo && !isDeleted;
+          });
+          this.persistCustomers(clean);
+          return clean;
         }
       }
     } catch (e) {
       console.warn('Failed to load stored customers:', e);
     }
 
-    // First time initialization:
-    const initial = EXTENDED_SEED_CUSTOMERS.filter(
-      c => !deleted.emails.has(c.email.toLowerCase().trim()) && !deleted.ids.has(c.id)
-    );
-    this.persistCustomers(initial);
-    return initial;
+    return [];
   }
 
   private persistCustomers(customers: Customer[]): void {
@@ -173,7 +150,7 @@ export class CustomerService {
 
   /**
    * Cross-sync customer order counts and lifetime spend directly from OrderService orders
-   * Skips any customer whose email is in the permanent deleted tombstone set.
+   * Skips any customer whose email is a demo email or in the permanent deleted tombstone set.
    */
   syncWithOrders(): void {
     const orders = this.orderService.orders();
@@ -191,8 +168,8 @@ export class CustomerService {
         if (!order.customerEmail) return;
         const emailKey = order.customerEmail.toLowerCase().trim();
 
-        // If this customer was deleted by the user, DO NOT resurrect them!
-        if (deleted.emails.has(emailKey)) {
+        // If this customer is a demo customer or was deleted by the user, DO NOT add!
+        if (DEMO_CUSTOMER_EMAILS.has(emailKey) || deleted.emails.has(emailKey)) {
           return;
         }
 
@@ -240,7 +217,7 @@ export class CustomerService {
 
   /**
    * Sync with live PostgreSQL backend `/users/admin/all`
-   * Skips any user whose email or ID is in the permanent deleted tombstone set.
+   * Skips any user whose email or ID is in the demo set or permanent deleted tombstone set.
    */
   async fetchBackendCustomers(): Promise<boolean> {
     try {
@@ -283,8 +260,14 @@ export class CustomerService {
             registeredUsers.forEach((u: any) => {
               const emailKey = (u.email || '').toLowerCase().trim();
 
-              // Do not add if permanently deleted
-              if (!emailKey || deleted.emails.has(emailKey) || deleted.ids.has(u.id)) {
+              // Do not add if demo customer or permanently deleted
+              if (
+                !emailKey || 
+                DEMO_CUSTOMER_EMAILS.has(emailKey) || 
+                DEMO_CUSTOMER_IDS.has(u.id) ||
+                deleted.emails.has(emailKey) || 
+                deleted.ids.has(u.id)
+              ) {
                 return;
               }
 

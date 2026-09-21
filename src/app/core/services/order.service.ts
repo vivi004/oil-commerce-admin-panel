@@ -47,21 +47,29 @@ export class OrderService {
     }
   }
 
+  private readonly demoOrderIds = new Set(['ord-8841', 'ord-8842', 'ord-8843', 'ord-9821', 'ord-8419', 'ord-7612']);
+  private readonly demoCustomerEmails = new Set(['anand.p@gmail.com', 'deepa.m@yahoo.com', 'karthik.sub@outlook.com', 'kavitha.s@gmail.com', 'suresh.b@gmail.com']);
+
   private loadInitialOrders(): Order[] {
     if (typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(ORDERS_STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+          if (Array.isArray(parsed)) {
+            const clean = parsed.filter(o => 
+              !this.demoOrderIds.has(o.id) &&
+              !this.demoCustomerEmails.has(o.customerEmail?.toLowerCase().trim())
+            );
+            this.persistOrders(clean);
+            return clean;
           }
         }
       } catch (e) {
         console.warn('Failed to load orders from localStorage:', e);
       }
     }
-    return INITIAL_ORDERS;
+    return [];
   }
 
   private persistOrders(orders: Order[]): void {
@@ -86,7 +94,8 @@ export class OrderService {
           const newOrdersFromSf: Order[] = [];
 
           for (const sfo of sfOrders) {
-            if (!currentIds.has(sfo.id)) {
+            const isDemo = this.demoOrderIds.has(sfo.id) || this.demoCustomerEmails.has(sfo.customerEmail?.toLowerCase().trim());
+            if (!isDemo && !currentIds.has(sfo.id)) {
               newOrdersFromSf.push(this.mapDtoToOrder(sfo));
             }
           }

@@ -25,17 +25,24 @@ interface PlatformUserItem {
 const INITIAL_STAFF: PlatformUserItem[] = [
   { id: '5329dbd2-f65c-4a00-8875-5687918426ab', name: 'Super Admin', firstName: 'Super', lastName: 'Admin', email: 'admin@oilcommerce.in', phone: '+91 98421 00000', role: Role.SUPER_ADMIN, tenantName: 'Platform Central', status: 'ACTIVE', lastActive: 'Just now' },
   { id: 'b6b04615-5a27-4dad-b4c3-8e18f207c683', name: 'Gowtham Raj', firstName: 'Gowtham', lastName: 'Raj', email: 'superadmin@nishapureoils.com', phone: '+91 98421 00009', role: Role.SUPER_ADMIN, tenantName: 'Platform Central', status: 'ACTIVE', lastActive: '10 mins ago' },
-  { id: 'fd5bfbe0-9652-4898-a9b3-06c47511e910', name: 'Kaviarasu M', firstName: 'Kaviarasu', lastName: 'M', email: 'admin@nishapureoils.com', phone: '+91 98421 00001', role: Role.TENANT_ADMIN, tenantName: 'Nisha Pure Oils', status: 'ACTIVE', lastActive: '5 mins ago' },
-  { id: '526f1445-942a-49c6-b47d-bff53c116fd6', name: 'Muruganathan S.', firstName: 'Muruganathan', lastName: 'S.', email: 'admin@varshinigold.com', phone: '+91 98421 00004', role: Role.TENANT_ADMIN, tenantName: 'Varshini Gold', status: 'ACTIVE', lastActive: 'Yesterday' },
-  { id: '2a90206f-f54f-4d3f-9c81-d45285779ebc', name: 'R. Velumani', firstName: 'R.', lastName: 'Velumani', email: 'warehouse@pureoils.com', phone: '+91 98421 00002', role: Role.INVENTORY_MANAGER, tenantName: 'Nisha Pure Oils', status: 'ACTIVE', lastActive: '1 hour ago' },
-  { id: '5206b801-62d1-42fb-bc93-bc8e59719383', name: 'Praveen Kumar', firstName: 'Praveen', lastName: 'Kumar', email: 'orders@pureoils.com', phone: '+91 98421 00003', role: Role.ORDER_MANAGER, tenantName: 'Nisha Pure Oils', status: 'ACTIVE', lastActive: '3 hours ago' },
-  { id: '89be5f22-9936-4e72-8fc2-ee12e2778989', name: 'Senthil Nathan', firstName: 'Senthil', lastName: 'Nathan', email: 'accounts@pureoils.com', phone: '+91 98421 00006', role: Role.ACCOUNTANT, tenantName: 'Nisha Pure Oils', status: 'ACTIVE', lastActive: 'Yesterday' },
-  { id: 'b07e72bf-8e9a-4688-93e1-b69042b9c93c', name: 'Lakshmi Priya', firstName: 'Lakshmi', lastName: 'Priya', email: 'support@pureoils.com', phone: '+91 98421 00007', role: Role.CUSTOMER_SUPPORT, tenantName: 'Nisha Pure Oils', status: 'ACTIVE', lastActive: '2 hours ago' },
-  { id: '73ac701c-f8a0-48f6-a50d-09d7597ec8a1', name: 'Kavitha Sundaram', firstName: 'Kavitha', lastName: 'Sundaram', email: 'kavitha.s@gmail.com', phone: '+91 98421 88442', role: 'CUSTOMER', tenantName: 'Customer Storefront', status: 'ACTIVE', lastActive: '3 days ago' },
-  { id: 'd635fd00-eea1-468f-a26a-bf970dbf232f', name: 'Anandapadmanabhan R', firstName: 'Anandapadmanabhan', lastName: 'R', email: 'anand.p@gmail.com', phone: '+91 98421 77654', role: 'CUSTOMER', tenantName: 'Customer Storefront', status: 'ACTIVE', lastActive: '5 days ago' }
+  { id: 'fd5bfbe0-9652-4898-a9b3-06c47511e910', name: 'Kaviarasu M', firstName: 'Kaviarasu', lastName: 'M', email: 'admin@nishapureoils.com', phone: '+91 98421 00001', role: Role.TENANT_ADMIN, tenantName: 'Nisha Pure Oils', status: 'ACTIVE', lastActive: '5 mins ago' }
 ];
 
-const PLATFORM_USERS_STORAGE_KEY = 'nisha_admin_platform_users_v1';
+export const DEMO_STAFF_AND_USER_EMAILS = new Set([
+  'kavitha.s@gmail.com',
+  'anand.p@gmail.com',
+  'deepa.m@yahoo.com',
+  'karthik.sub@outlook.com',
+  'suresh.b@gmail.com',
+  'admin@pureoils.com',
+  'warehouse@pureoils.com',
+  'orders@pureoils.com',
+  'accounts@pureoils.com',
+  'support@pureoils.com',
+  'admin@varshinigold.com'
+]);
+
+const PLATFORM_USERS_STORAGE_KEY = 'nisha_admin_platform_users_v2';
 
 @Component({
   selector: 'app-platform-users',
@@ -387,11 +394,13 @@ export class PlatformUsersComponent implements OnInit {
   private loadInitialUsers(): PlatformUserItem[] {
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem(PLATFORM_USERS_STORAGE_KEY);
+        const stored = localStorage.getItem(PLATFORM_USERS_STORAGE_KEY) || localStorage.getItem('nisha_admin_platform_users_v1');
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            const clean = parsed.filter(u => !DEMO_STAFF_AND_USER_EMAILS.has(u.email?.toLowerCase().trim()));
+            this.persistUsers(clean);
+            return clean;
           }
         }
       } catch (e) {
@@ -628,13 +637,12 @@ export class PlatformUsersComponent implements OnInit {
       const token = localStorage.getItem('nisha_admin_token');
 
       if (this.isCreatingUser) {
-        const newId = `usr-${Date.now()}`;
-        const newName = `${payload.firstName} ${payload.lastName}`.trim() || payload.email;
+        let createdServerUser: any = null;
 
-        // Try to create in backend if endpoint available
+        // Provision in backend database with Super Admin authority
         if (token) {
           try {
-            await fetchWithTimeout(getApiUrl('/auth/register'), {
+            const res = await fetchWithTimeout(getApiUrl('/users/admin/create'), {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -646,11 +654,24 @@ export class PlatformUsersComponent implements OnInit {
                 email: payload.email,
                 password: payload.password,
                 phone: payload.phone,
-                role: payload.role
+                role: payload.role,
+                active: payload.active
               })
-            }, 1500);
-          } catch {}
+            }, 3000);
+
+            if (res.ok) {
+              const resData = await res.json();
+              if (resData.success && resData.data) {
+                createdServerUser = resData.data;
+              }
+            }
+          } catch (e) {
+            console.warn('Backend admin create user failed or timeout, saved locally:', e);
+          }
         }
+
+        const newId = createdServerUser?.id || `usr-${Date.now()}`;
+        const newName = `${payload.firstName} ${payload.lastName}`.trim() || payload.email;
 
         const newUser: PlatformUserItem = {
           id: newId,
@@ -666,7 +687,7 @@ export class PlatformUsersComponent implements OnInit {
         };
 
         this.users.update(list => {
-          const updated = [newUser, ...list];
+          const updated = [newUser, ...list.filter(u => u.email.toLowerCase() !== payload.email.toLowerCase() && !DEMO_STAFF_AND_USER_EMAILS.has(u.email.toLowerCase()))];
           this.persistUsers(updated);
           return updated;
         });
@@ -752,35 +773,37 @@ export class PlatformUsersComponent implements OnInit {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-          const liveUsers: PlatformUserItem[] = json.data.map((u: any) => {
-            const roleStr = u.role || 'CUSTOMER';
-            let tenantName = 'Customer Storefront';
-            if (roleStr === 'SUPER_ADMIN') {
-              tenantName = 'Platform Central';
-            } else if (roleStr === 'TENANT_ADMIN') {
-              tenantName = (u.email && u.email.includes('varshini')) ? 'Varshini Gold' : 'Nisha Pure Oils';
-            } else if (['INVENTORY_MANAGER', 'ORDER_MANAGER', 'ACCOUNTANT', 'CUSTOMER_SUPPORT', 'PRODUCT_MANAGER'].includes(roleStr)) {
-              tenantName = 'Nisha Pure Oils';
-            }
+          const liveUsers: PlatformUserItem[] = json.data
+            .filter((u: any) => !DEMO_STAFF_AND_USER_EMAILS.has(u.email?.toLowerCase().trim()))
+            .map((u: any) => {
+              const roleStr = u.role || 'CUSTOMER';
+              let tenantName = 'Customer Storefront';
+              if (roleStr === 'SUPER_ADMIN') {
+                tenantName = 'Platform Central';
+              } else if (roleStr === 'TENANT_ADMIN') {
+                tenantName = (u.email && u.email.includes('varshini')) ? 'Varshini Gold' : 'Nisha Pure Oils';
+              } else if (['INVENTORY_MANAGER', 'ORDER_MANAGER', 'ACCOUNTANT', 'CUSTOMER_SUPPORT', 'PRODUCT_MANAGER'].includes(roleStr)) {
+                tenantName = 'Nisha Pure Oils';
+              }
 
-            return {
-              id: u.id,
-              name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email,
-              firstName: u.firstName,
-              lastName: u.lastName,
-              email: u.email,
-              phone: u.phone || '',
-              role: roleStr,
-              tenantName,
-              status: u.active !== false ? 'ACTIVE' : 'INACTIVE',
-              lastActive: 'Active'
-            };
-          });
+              return {
+                id: u.id,
+                name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email,
+                firstName: u.firstName,
+                lastName: u.lastName,
+                email: u.email,
+                phone: u.phone || '',
+                role: roleStr,
+                tenantName,
+                status: u.active !== false ? 'ACTIVE' : 'INACTIVE',
+                lastActive: 'Active'
+              };
+            });
 
-          // Deduplicate by email with current users
-          const currentList = this.users();
+          // Deduplicate by email with current users excluding demo emails
+          const currentList = this.users().filter(u => !DEMO_STAFF_AND_USER_EMAILS.has(u.email.toLowerCase().trim()));
           const liveEmails = new Set(liveUsers.map(u => u.email.toLowerCase()));
-          const remainingLocal = currentList.filter(u => !liveEmails.has(u.email.toLowerCase()));
+          const remainingLocal = currentList.filter(u => !liveEmails.has(u.email.toLowerCase()) && !DEMO_STAFF_AND_USER_EMAILS.has(u.email.toLowerCase()));
           const merged = [...liveUsers, ...remainingLocal];
           this.users.set(merged);
           this.persistUsers(merged);
