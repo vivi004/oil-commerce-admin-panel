@@ -5,7 +5,8 @@ import { OrderService } from './order.service';
 import { fetchWithTimeout, getApiUrl } from '../utils/api.utils';
 import { environment } from '../../../environments/environment';
 
-const CUSTOMERS_STORAGE_KEY = 'nisha_admin_customers_v1';
+const CUSTOMERS_STORAGE_KEY = 'nisha_admin_customers_v2';
+const DELETED_CUSTOMERS_STORAGE_KEY = 'nisha_admin_deleted_customers_v2';
 
 const EXTENDED_SEED_CUSTOMERS: Customer[] = [
   ...INITIAL_CUSTOMERS,
@@ -76,20 +77,89 @@ export class CustomerService {
     this.fetchBackendCustomers();
   }
 
+  /**
+   * Load permanent tombstone records for deleted customers (IDs and Emails)
+   */
+  private loadDeletedRecords(): { ids: Set<string>; emails: Set<string> } {
+    if (typeof window === 'undefined') {
+      return { ids: new Set(), emails: new Set() };
+    }
+    try {
+      const raw = localStorage.getItem(DELETED_CUSTOMERS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          ids: new Set(parsed.ids || []),
+          emails: new Set((parsed.emails || []).map((e: string) => e.toLowerCase().trim()))
+        };
+      }
+    } catch {}
+    return { ids: new Set(), emails: new Set() };
+  }
+
+  /**
+   * Record customer ID and email as permanently deleted so they NEVER resurrect on reload
+   */
+  private recordDeletedCustomer(id: string, email?: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const deleted = this.loadDeletedRecords();
+      if (id) deleted.ids.add(id);
+      if (email) deleted.emails.add(email.toLowerCase().trim());
+      localStorage.setItem(DELETED_CUSTOMERS_STORAGE_KEY, JSON.stringify({
+        ids: Array.from(deleted.ids),
+        emails: Array.from(deleted.emails)
+      }));
+    } catch (e) {
+      console.warn('Failed to record deleted customer:', e);
+    }
+  }
+
+  /**
+   * Remove a customer from the deleted tombstone (e.g. if explicitly created anew)
+   */
+  private unmarkDeletedCustomer(email?: string): void {
+    if (typeof window === 'undefined' || !email) return;
+    try {
+      const deleted = this.loadDeletedRecords();
+      deleted.emails.delete(email.toLowerCase().trim());
+      localStorage.setItem(DELETED_CUSTOMERS_STORAGE_KEY, JSON.stringify({
+        ids: Array.from(deleted.ids),
+        emails: Array.from(deleted.emails)
+      }));
+    } catch {}
+  }
+
   private loadStoredCustomers(): Customer[] {
-    if (typeof window === 'undefined') return EXTENDED_SEED_CUSTOMERS;
+    const deleted = this.loadDeletedRecords();
+
+    if (typeof window === 'undefined') {
+      return EXTENDED_SEED_CUSTOMERS.filter(
+        c => !deleted.emails.has(c.email.toLowerCase().trim()) && !deleted.ids.has(c.id)
+      );
+    }
+
     try {
       const stored = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
-      if (stored) {
+      // If user previously saved anything (even an empty array [] or 1 single customer), respect it!
+      if (stored !== null) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter(
+            c => !deleted.emails.has(c.email?.toLowerCase().trim()) && !deleted.ids.has(c.id)
+          );
         }
       }
     } catch (e) {
       console.warn('Failed to load stored customers:', e);
     }
-    return EXTENDED_SEED_CUSTOMERS;
+
+    // First time initialization:
+    const initial = EXTENDED_SEED_CUSTOMERS.filter(
+      c => !deleted.emails.has(c.email.toLowerCase().trim()) && !deleted.ids.has(c.id)
+    );
+    this.persistCustomers(initial);
+    return initial;
   }
 
   private persistCustomers(customers: Customer[]): void {
@@ -103,22 +173,30 @@ export class CustomerService {
 
   /**
    * Cross-sync customer order counts and lifetime spend directly from OrderService orders
+   * Skips any customer whose email is in the permanent deleted tombstone set.
    */
   syncWithOrders(): void {
     const orders = this.orderService.orders();
     if (!orders || orders.length === 0) return;
 
+    const deleted = this.loadDeletedRecords();
+
     this.customersSignal.update(currentList => {
       const updatedList = [...currentList];
       const emailMap = new Map<string, Customer>();
       
-      updatedList.forEach(c => emailMap.set(c.email.toLowerCase(), c));
+      updatedList.forEach(c => emailMap.set(c.email.toLowerCase().trim(), c));
 
       orders.forEach(order => {
         if (!order.customerEmail) return;
         const emailKey = order.customerEmail.toLowerCase().trim();
-        const existing = emailMap.get(emailKey);
 
+        // If this customer was deleted by the user, DO NOT resurrect them!
+        if (deleted.emails.has(emailKey)) {
+          return;
+        }
+
+        const existing = emailMap.get(emailKey);
         const customerOrders = orders.filter(
           o => o.customerEmail?.toLowerCase().trim() === emailKey
         );
@@ -134,7 +212,7 @@ export class CustomerService {
             existing.address = order.shippingAddress;
           }
         } else {
-          // Discover new customer from live orders
+          // Discover new active storefront customer
           const newCust: Customer = {
             id: `cust-auto-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             fullName: order.customerName || 'Store Customer',
@@ -162,6 +240,7 @@ export class CustomerService {
 
   /**
    * Sync with live PostgreSQL backend `/users/admin/all`
+   * Skips any user whose email or ID is in the permanent deleted tombstone set.
    */
   async fetchBackendCustomers(): Promise<boolean> {
     try {
@@ -195,16 +274,23 @@ export class CustomerService {
         if (json.success && Array.isArray(json.data)) {
           const allOrders = this.orderService.orders();
           const registeredUsers = json.data.filter((u: any) => u.role === 'CUSTOMER');
+          const deleted = this.loadDeletedRecords();
 
           this.customersSignal.update(current => {
-            const currentEmails = new Map(current.map(c => [c.email.toLowerCase(), c]));
+            const currentEmails = new Map(current.map(c => [c.email.toLowerCase().trim(), c]));
             const merged: Customer[] = [...current];
 
             registeredUsers.forEach((u: any) => {
-              const emailKey = u.email.toLowerCase();
+              const emailKey = (u.email || '').toLowerCase().trim();
+
+              // Do not add if permanently deleted
+              if (!emailKey || deleted.emails.has(emailKey) || deleted.ids.has(u.id)) {
+                return;
+              }
+
               const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Store Customer';
               const userOrders = allOrders.filter(
-                o => (o.customerEmail && o.customerEmail.toLowerCase() === emailKey) ||
+                o => (o.customerEmail && o.customerEmail.toLowerCase().trim() === emailKey) ||
                      (o.customerPhone && u.phone && o.customerPhone.includes(u.phone))
               );
               const totalOrders = userOrders.length;
@@ -255,6 +341,8 @@ export class CustomerService {
   }
 
   addCustomer(customer: Omit<Customer, 'id' | 'createdAt'>): Customer {
+    this.unmarkDeletedCustomer(customer.email);
+
     const newCustomer: Customer = {
       ...customer,
       id: `cust-${Date.now()}`,
@@ -271,6 +359,10 @@ export class CustomerService {
   }
 
   updateCustomer(id: string, updates: Partial<Customer>): void {
+    if (updates.email) {
+      this.unmarkDeletedCustomer(updates.email);
+    }
+
     this.customersSignal.update(list => {
       const updated = list.map(c => c.id === id ? { ...c, ...updates } : c);
       this.persistCustomers(updated);
@@ -279,11 +371,30 @@ export class CustomerService {
   }
 
   deleteCustomer(id: string): void {
+    const target = this.customersSignal().find(c => c.id === id);
+    const email = target?.email;
+
+    // 1. Record in permanent tombstone set so it never resurrects on reload or sync
+    this.recordDeletedCustomer(id, email);
+
+    // 2. Remove from active signal and persist immediately
     this.customersSignal.update(list => {
       const updated = list.filter(c => c.id !== id);
       this.persistCustomers(updated);
       return updated;
     });
+
+    // 3. If UUID, delete from backend PostgreSQL database as well
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUuid && typeof window !== 'undefined') {
+      const token = localStorage.getItem('nisha_admin_token');
+      if (token) {
+        fetchWithTimeout(getApiUrl(`/users/admin/${id}`), {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        }, 4000).catch(() => {});
+      }
+    }
   }
 
   getCustomerOrders(customerEmail: string, customerPhone?: string): Order[] {

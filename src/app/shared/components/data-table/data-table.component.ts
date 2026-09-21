@@ -103,8 +103,8 @@ export interface ColumnDef {
       <!-- Pagination Footer -->
       <div *ngIf="showPagination && totalCount > 0" class="px-4 sm:px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
         <div>
-          Showing <span class="font-bold text-slate-800 dark:text-slate-200">{{ startItemIndex() }}</span> to
-          <span class="font-bold text-slate-800 dark:text-slate-200">{{ endItemIndex() }}</span> of
+          Showing <span class="font-bold text-slate-800 dark:text-slate-200">{{ startItemIndex }}</span> to
+          <span class="font-bold text-slate-800 dark:text-slate-200">{{ endItemIndex }}</span> of
           <span class="font-bold text-slate-800 dark:text-slate-200">{{ totalCount }}</span> entries
         </div>
 
@@ -121,13 +121,13 @@ export interface ColumnDef {
 
           <!-- Current / Total -->
           <span class="px-2 font-semibold text-slate-700 dark:text-slate-300">
-            Page {{ currentPage() }} of {{ totalPages() }}
+            Page {{ currentPage() }} of {{ totalPages }}
           </span>
 
           <!-- Next Button -->
           <button
             type="button"
-            [disabled]="currentPage() >= totalPages()"
+            [disabled]="currentPage() >= totalPages"
             (click)="goToPage(currentPage() + 1)"
             class="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 font-medium transition-colors"
           >
@@ -159,9 +159,19 @@ export class DataTableComponent {
   sortColumn = signal<string>('');
   sortDirection = signal<'asc' | 'desc'>('asc');
 
-  totalPages = computed(() => Math.max(1, Math.ceil(this.totalCount / this.pageSize)));
-  startItemIndex = computed(() => this.totalCount === 0 ? 0 : (this.currentPage() - 1) * this.pageSize + 1);
-  endItemIndex = computed(() => Math.min(this.totalCount, this.currentPage() * this.pageSize));
+  get totalPages(): number {
+    return Math.max(1, Math.ceil((this.totalCount || 0) / (this.pageSize || 10)));
+  }
+
+  get startItemIndex(): number {
+    if (!this.totalCount || this.totalCount === 0) return 0;
+    return (this.currentPage() - 1) * this.pageSize + 1;
+  }
+
+  get endItemIndex(): number {
+    if (!this.totalCount || this.totalCount === 0) return 0;
+    return Math.min(this.totalCount, this.currentPage() * this.pageSize);
+  }
 
   onSearchChange(query: string): void {
     this.searchQuery.set(query);
@@ -187,7 +197,7 @@ export class DataTableComponent {
   }
 
   goToPage(page: number): void {
-    if (page >= 1 && page <= this.totalPages()) {
+    if (page >= 1 && page <= this.totalPages) {
       this.currentPage.set(page);
       this.pageChange.emit(page);
     }
