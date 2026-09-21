@@ -28,20 +28,6 @@ const INITIAL_STAFF: PlatformUserItem[] = [
   { id: 'fd5bfbe0-9652-4898-a9b3-06c47511e910', name: 'Kaviarasu M', firstName: 'Kaviarasu', lastName: 'M', email: 'admin@nishapureoils.com', phone: '+91 98421 00001', role: Role.TENANT_ADMIN, tenantName: 'Nisha Pure Oils', status: 'ACTIVE', lastActive: '5 mins ago' }
 ];
 
-export const DEMO_STAFF_AND_USER_EMAILS = new Set([
-  'kavitha.s@gmail.com',
-  'anand.p@gmail.com',
-  'deepa.m@yahoo.com',
-  'karthik.sub@outlook.com',
-  'suresh.b@gmail.com',
-  'admin@pureoils.com',
-  'warehouse@pureoils.com',
-  'orders@pureoils.com',
-  'accounts@pureoils.com',
-  'support@pureoils.com',
-  'admin@varshinigold.com'
-]);
-
 const PLATFORM_USERS_STORAGE_KEY = 'nisha_admin_platform_users_v2';
 
 @Component({
@@ -394,13 +380,11 @@ export class PlatformUsersComponent implements OnInit {
   private loadInitialUsers(): PlatformUserItem[] {
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem(PLATFORM_USERS_STORAGE_KEY) || localStorage.getItem('nisha_admin_platform_users_v1');
+        const stored = localStorage.getItem(PLATFORM_USERS_STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const clean = parsed.filter(u => !DEMO_STAFF_AND_USER_EMAILS.has(u.email?.toLowerCase().trim()));
-            this.persistUsers(clean);
-            return clean;
+            return parsed;
           }
         }
       } catch (e) {
@@ -687,7 +671,7 @@ export class PlatformUsersComponent implements OnInit {
         };
 
         this.users.update(list => {
-          const updated = [newUser, ...list.filter(u => u.email.toLowerCase() !== payload.email.toLowerCase() && !DEMO_STAFF_AND_USER_EMAILS.has(u.email.toLowerCase()))];
+          const updated = [newUser, ...list.filter(u => u.email.toLowerCase() !== payload.email.toLowerCase())];
           this.persistUsers(updated);
           return updated;
         });
@@ -773,37 +757,35 @@ export class PlatformUsersComponent implements OnInit {
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
-          const liveUsers: PlatformUserItem[] = json.data
-            .filter((u: any) => !DEMO_STAFF_AND_USER_EMAILS.has(u.email?.toLowerCase().trim()))
-            .map((u: any) => {
-              const roleStr = u.role || 'CUSTOMER';
-              let tenantName = 'Customer Storefront';
-              if (roleStr === 'SUPER_ADMIN') {
-                tenantName = 'Platform Central';
-              } else if (roleStr === 'TENANT_ADMIN') {
-                tenantName = (u.email && u.email.includes('varshini')) ? 'Varshini Gold' : 'Nisha Pure Oils';
-              } else if (['INVENTORY_MANAGER', 'ORDER_MANAGER', 'ACCOUNTANT', 'CUSTOMER_SUPPORT', 'PRODUCT_MANAGER'].includes(roleStr)) {
-                tenantName = 'Nisha Pure Oils';
-              }
+          const liveUsers: PlatformUserItem[] = json.data.map((u: any) => {
+            const roleStr = u.role || 'CUSTOMER';
+            let tenantName = 'Customer Storefront';
+            if (roleStr === 'SUPER_ADMIN') {
+              tenantName = 'Platform Central';
+            } else if (roleStr === 'TENANT_ADMIN') {
+              tenantName = (u.email && u.email.includes('varshini')) ? 'Varshini Gold' : 'Nisha Pure Oils';
+            } else if (['INVENTORY_MANAGER', 'ORDER_MANAGER', 'ACCOUNTANT', 'CUSTOMER_SUPPORT', 'PRODUCT_MANAGER'].includes(roleStr)) {
+              tenantName = 'Nisha Pure Oils';
+            }
 
-              return {
-                id: u.id,
-                name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email,
-                firstName: u.firstName,
-                lastName: u.lastName,
-                email: u.email,
-                phone: u.phone || '',
-                role: roleStr,
-                tenantName,
-                status: u.active !== false ? 'ACTIVE' : 'INACTIVE',
-                lastActive: 'Active'
-              };
-            });
+            return {
+              id: u.id,
+              name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email,
+              firstName: u.firstName,
+              lastName: u.lastName,
+              email: u.email,
+              phone: u.phone || '',
+              role: roleStr,
+              tenantName,
+              status: u.active !== false ? 'ACTIVE' : 'INACTIVE',
+              lastActive: 'Active'
+            };
+          });
 
-          // Deduplicate by email with current users excluding demo emails
-          const currentList = this.users().filter(u => !DEMO_STAFF_AND_USER_EMAILS.has(u.email.toLowerCase().trim()));
+          // Deduplicate by email with current users
+          const currentList = this.users();
           const liveEmails = new Set(liveUsers.map(u => u.email.toLowerCase()));
-          const remainingLocal = currentList.filter(u => !liveEmails.has(u.email.toLowerCase()) && !DEMO_STAFF_AND_USER_EMAILS.has(u.email.toLowerCase()));
+          const remainingLocal = currentList.filter(u => !liveEmails.has(u.email.toLowerCase()));
           const merged = [...liveUsers, ...remainingLocal];
           this.users.set(merged);
           this.persistUsers(merged);

@@ -7,15 +7,6 @@ import { environment } from '../../../environments/environment';
 const CUSTOMERS_STORAGE_KEY = 'nisha_admin_customers_v2';
 const DELETED_CUSTOMERS_STORAGE_KEY = 'nisha_admin_deleted_customers_v2';
 
-export const DEMO_CUSTOMER_EMAILS = new Set([
-  'anand.p@gmail.com',
-  'deepa.m@yahoo.com',
-  'karthik.sub@outlook.com',
-  'kavitha.s@gmail.com',
-  'suresh.b@gmail.com'
-]);
-
-export const DEMO_CUSTOMER_IDS = new Set(['cust-1', 'cust-2', 'cust-3', 'cust-4', 'cust-5']);
 
 @Injectable({
   providedIn: 'root'
@@ -121,12 +112,10 @@ export class CustomerService {
       if (stored !== null) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          // Retain only authentic customer accounts, exclude all mock/demo data and deleted tombstones
           const clean = parsed.filter(c => {
             const emailKey = (c.email || '').toLowerCase().trim();
-            const isDemo = DEMO_CUSTOMER_EMAILS.has(emailKey) || DEMO_CUSTOMER_IDS.has(c.id);
             const isDeleted = deleted.emails.has(emailKey) || deleted.ids.has(c.id);
-            return !isDemo && !isDeleted;
+            return !isDeleted;
           });
           this.persistCustomers(clean);
           return clean;
@@ -168,8 +157,8 @@ export class CustomerService {
         if (!order.customerEmail) return;
         const emailKey = order.customerEmail.toLowerCase().trim();
 
-        // If this customer is a demo customer or was deleted by the user, DO NOT add!
-        if (DEMO_CUSTOMER_EMAILS.has(emailKey) || deleted.emails.has(emailKey)) {
+        // If this customer was deleted by the user, DO NOT add!
+        if (deleted.emails.has(emailKey)) {
           return;
         }
 
@@ -260,11 +249,9 @@ export class CustomerService {
             registeredUsers.forEach((u: any) => {
               const emailKey = (u.email || '').toLowerCase().trim();
 
-              // Do not add if demo customer or permanently deleted
+              // Do not add if permanently deleted
               if (
                 !emailKey || 
-                DEMO_CUSTOMER_EMAILS.has(emailKey) || 
-                DEMO_CUSTOMER_IDS.has(u.id) ||
                 deleted.emails.has(emailKey) || 
                 deleted.ids.has(u.id)
               ) {
