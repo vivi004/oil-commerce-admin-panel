@@ -37,6 +37,7 @@ export class OrderService {
   );
 
   constructor() {
+    this.purgeDemoOrders();
     this.fetchOrdersFromBackend();
     // Periodically sync orders every 10 seconds to catch new customer orders
     if (typeof window !== 'undefined') {
@@ -47,6 +48,34 @@ export class OrderService {
     }
   }
 
+  isDemoOrder(o: any): boolean {
+    if (!o) return true;
+    const demoIds = new Set(['ord-8841', 'ord-8842', 'ord-8843', 'ord-9821', 'ord-8419', 'ord-7612']);
+    const demoNumbers = new Set(['NPO-2025-8841', 'NPO-2025-8842', 'NPO-2025-8843', 'NPO-8841', 'NPO-8842', 'NPO-8843']);
+    const demoNames = ['anandapadmanabhan', 'deepa meenakshi', 'karthikeyan subramanian', 'kavitha', 'suresh b'];
+    const demoEmails = new Set(['anand.p@gmail.com', 'deepa.m@yahoo.com', 'karthik.sub@outlook.com', 'kavitha.s@gmail.com', 'suresh.b@gmail.com']);
+
+    const id = String(o.id || '').trim();
+    const num = String(o.orderNumber || '').trim();
+    const name = String(o.customerName || '').toLowerCase().trim();
+    const email = String(o.customerEmail || '').toLowerCase().trim();
+
+    if (demoIds.has(id) || demoNumbers.has(num)) return true;
+    if (num.startsWith('NPO-2025-') || num.startsWith('DEMO-')) return true;
+    if (demoEmails.has(email)) return true;
+    if (demoNames.some(d => name.includes(d))) return true;
+
+    return false;
+  }
+
+  purgeDemoOrders(): void {
+    this.ordersSignal.update(list => {
+      const clean = list.filter(o => !this.isDemoOrder(o));
+      this.persistOrders(clean);
+      return clean;
+    });
+  }
+
   private loadInitialOrders(): Order[] {
     if (typeof window !== 'undefined') {
       try {
@@ -54,7 +83,9 @@ export class OrderService {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
-            return parsed;
+            const clean = parsed.filter(o => !this.isDemoOrder(o));
+            this.persistOrders(clean);
+            return clean;
           }
         }
       } catch (e) {
@@ -67,7 +98,8 @@ export class OrderService {
   private persistOrders(orders: Order[]): void {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+        const clean = orders.filter(o => !this.isDemoOrder(o));
+        localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(clean));
       } catch (e) {
         console.warn('Failed to persist orders to localStorage:', e);
       }
@@ -81,12 +113,12 @@ export class OrderService {
       if (sfOrdersRaw) {
         const sfOrders = JSON.parse(sfOrdersRaw);
         if (Array.isArray(sfOrders) && sfOrders.length > 0) {
-          const currentOrders = this.ordersSignal();
+          const currentOrders = this.ordersSignal().filter(o => !this.isDemoOrder(o));
           const currentIds = new Set(currentOrders.map(o => o.id));
           const newOrdersFromSf: Order[] = [];
 
           for (const sfo of sfOrders) {
-            if (!currentIds.has(sfo.id)) {
+            if (!this.isDemoOrder(sfo) && !currentIds.has(sfo.id)) {
               newOrdersFromSf.push(this.mapDtoToOrder(sfo));
             }
           }
@@ -144,10 +176,12 @@ export class OrderService {
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data?.items) {
-          const backendOrders: Order[] = json.data.items.map((dto: any) => this.mapDtoToOrder(dto));
+          const backendOrders: Order[] = json.data.items
+            .filter((dto: any) => !this.isDemoOrder(dto))
+            .map((dto: any) => this.mapDtoToOrder(dto));
           
           // Merge backend orders with existing orders (backend orders placed on top)
-          const currentOrders = this.ordersSignal();
+          const currentOrders = this.ordersSignal().filter(o => !this.isDemoOrder(o));
           const backendIds = new Set(backendOrders.map(o => o.id));
           const remainingLocal = currentOrders.filter(o => !backendIds.has(o.id));
           const merged = [...backendOrders, ...remainingLocal];
