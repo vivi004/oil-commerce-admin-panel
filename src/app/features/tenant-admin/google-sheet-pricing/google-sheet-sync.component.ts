@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { GoogleSheetService } from '../../../core/services/google-sheet.service';
+import { LiveSyncService } from '../../../core/services/live-sync.service';
 import { SheetDiffItem } from '../../../core/models/app.models';
 import { BadgeComponent } from '../../../shared/components/badge/badge.component';
 
@@ -41,6 +42,18 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
         </div>
 
         <div class="flex flex-wrap items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <!-- Sync Live Button -->
+          <button
+            type="button"
+            (click)="syncLive()"
+            [disabled]="liveSyncService.isSyncing()"
+            class="w-full sm:w-auto justify-center px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-60"
+            title="Sync live catalog & products from backend"
+          >
+            <span class="material-symbols-outlined text-[16px]" [ngClass]="{'animate-spin text-amber-500': liveSyncService.isSyncing()}">sync</span>
+            <span>{{ liveSyncService.isSyncing() ? 'Syncing...' : 'Sync Live' }}</span>
+          </button>
+
           <button
             type="button"
             (click)="downloadTemplate()"
@@ -252,9 +265,14 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
 })
 export class GoogleSheetSyncComponent {
   sheetService = inject(GoogleSheetService);
+  readonly liveSyncService = inject(LiveSyncService);
   Math = Math;
   isEditingUrl = signal<boolean>(false);
   tempUrl = '';
+
+  async syncLive(): Promise<void> {
+    await this.liveSyncService.syncCatalog();
+  }
 
   constructor() {
     this.tempUrl = this.sheetService.connectedSheetUrl();

@@ -25,6 +25,7 @@ export class ProductService {
   readonly products = this.productsSignal.asReadonly();
   readonly categories = this.categoriesSignal.asReadonly();
   readonly brands = this.brandsSignal.asReadonly();
+  readonly isSyncing = signal<boolean>(false);
 
   readonly totalProductsCount = computed(() => this.productsSignal().length);
   readonly activeProductsCount = computed(() => this.productsSignal().filter(p => p.status === ProductStatus.ACTIVE).length);
@@ -295,113 +296,152 @@ export class ProductService {
     return `${this.storefrontUrl}/categories/${slug}`;
   }
 
-  async syncFromBackend(): Promise<void> {
+  async syncFromBackend(): Promise<{ success: boolean; categoriesCount: number; brandsCount: number; productsCount: number }> {
+    this.isSyncing.set(true);
+    let catsCount = 0;
+    let brandsCount = 0;
+    let prodsCount = 0;
+    let hasSuccess = false;
+
     try {
       // 1. Sync categories
-      const catRes = await fetchWithTimeout(getApiUrl('/categories'), {}, 15000);
-      if (catRes.ok) {
-        const catData = await catRes.json();
-        if (catData.success && Array.isArray(catData.data) && catData.data.length > 0) {
-          const deletedCatIds = this.getDeletedCategoryIds();
-          const liveCats: Category[] = catData.data
-            .filter((c: any) => !deletedCatIds.has(c.id))
-            .map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              slug: c.slug || c.name.toLowerCase().replace(/\s+/g, '-'),
-              description: c.description || '',
-              image: c.image || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80',
-              productCount: c.productCount || 0,
-              isActive: c.isActive !== false,
-              seoTitle: c.seoTitle || c.name,
-              seoDescription: c.seoDescription || c.description
-            }));
+      try {
+        const catRes = await fetchWithTimeout(getApiUrl('/categories'), {}, 20000);
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          if (catData.success && Array.isArray(catData.data) && catData.data.length > 0) {
+            const deletedCatIds = this.getDeletedCategoryIds();
+            const liveCats: Category[] = catData.data
+              .filter((c: any) => !deletedCatIds.has(c.id))
+              .map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                slug: c.slug || c.name.toLowerCase().replace(/\s+/g, '-'),
+                description: c.description || '',
+                image: c.image || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80',
+                productCount: c.productCount || 0,
+                isActive: c.isActive !== false,
+                seoTitle: c.seoTitle || c.name,
+                seoDescription: c.seoDescription || c.description
+              }));
 
-          const currentMap = new Map(this.categoriesSignal().map(c => [c.id, c]));
-          // Remove mock categories if live backend category with same slug/name exists
-          liveCats.forEach(lc => {
-            const lcSlug = lc.slug.toLowerCase();
-            for (const [id, c] of currentMap.entries()) {
-              if (id.startsWith('cat-') && (c.slug.toLowerCase() === lcSlug || c.name.toLowerCase() === lc.name.toLowerCase())) {
-                currentMap.delete(id);
+            const currentMap = new Map(this.categoriesSignal().map(c => [c.id, c]));
+            // Remove mock categories if live backend category with same slug/name exists
+            liveCats.forEach(lc => {
+              const lcSlug = lc.slug.toLowerCase();
+              for (const [id, c] of currentMap.entries()) {
+                if (id.startsWith('cat-') && (c.slug.toLowerCase() === lcSlug || c.name.toLowerCase() === lc.name.toLowerCase())) {
+                  currentMap.delete(id);
+                }
               }
-            }
-            currentMap.set(lc.id, lc);
-          });
-          deletedCatIds.forEach(id => currentMap.delete(id));
-          const mergedCats = Array.from(currentMap.values());
-          this.categoriesSignal.set(mergedCats);
-          this.persistCategories(mergedCats);
+              currentMap.set(lc.id, lc);
+            });
+            deletedCatIds.forEach(id => currentMap.delete(id));
+            const mergedCats = Array.from(currentMap.values());
+            this.categoriesSignal.set(mergedCats);
+            this.persistCategories(mergedCats);
+            catsCount = mergedCats.length;
+            hasSuccess = true;
+          }
         }
+      } catch (e) {
+        console.warn('Live sync categories warning:', e);
       }
 
       // 2. Sync brands
-      const brandRes = await fetchWithTimeout(getApiUrl('/brands'), {}, 15000);
-      if (brandRes.ok) {
-        const brandData = await brandRes.json();
-        if (brandData.success && Array.isArray(brandData.data) && brandData.data.length > 0) {
-          const deletedBrandIds = this.getDeletedBrandIds();
-          const currentProds = this.productsSignal();
+      try {
+        const brandRes = await fetchWithTimeout(getApiUrl('/brands'), {}, 20000);
+        if (brandRes.ok) {
+          const brandData = await brandRes.json();
+          if (brandData.success && Array.isArray(brandData.data) && brandData.data.length > 0) {
+            const deletedBrandIds = this.getDeletedBrandIds();
+            const currentProds = this.productsSignal();
 
-          const liveBrands: Brand[] = brandData.data
-            .filter((b: any) => !deletedBrandIds.has(b.id))
-            .map((b: any) => {
-              const liveName = b.name || '';
-              const count = currentProds.filter(
-                p => p.brand?.trim().toLowerCase() === liveName.trim().toLowerCase() ||
-                     (p as any).brandId === b.id
-              ).length;
+            const liveBrands: Brand[] = brandData.data
+              .filter((b: any) => !deletedBrandIds.has(b.id))
+              .map((b: any) => {
+                const liveName = b.name || '';
+                const count = currentProds.filter(
+                  p => p.brand?.trim().toLowerCase() === liveName.trim().toLowerCase() ||
+                       (p as any).brandId === b.id
+                ).length;
 
-              return {
-                id: b.id,
-                name: liveName,
-                logo: b.logo,
-                description: b.description || '',
-                isActive: b.isActive !== false && (b as any).active !== false,
-                productCount: count || b.productCount || 0
-              };
+                return {
+                  id: b.id,
+                  name: liveName,
+                  logo: b.logo,
+                  description: b.description || '',
+                  isActive: b.isActive !== false && (b as any).active !== false,
+                  productCount: count || b.productCount || 0
+                };
+              });
+
+            const currentBrandMap = new Map(this.brandsSignal().map(b => [b.id, b]));
+
+            // Deduplicate: remove mock brands (br-*) if live backend brand with same name exists
+            liveBrands.forEach(lb => {
+              const lbName = lb.name.trim().toLowerCase();
+              for (const [id, b] of currentBrandMap.entries()) {
+                if (id.startsWith('br-') && b.name.trim().toLowerCase() === lbName) {
+                  currentBrandMap.delete(id);
+                }
+              }
+              currentBrandMap.set(lb.id, lb);
             });
 
-          const currentBrandMap = new Map(this.brandsSignal().map(b => [b.id, b]));
+            // Ensure no deleted brands sneak in
+            deletedBrandIds.forEach(id => currentBrandMap.delete(id));
 
-          // Deduplicate: remove mock brands (br-*) if live backend brand with same name exists
-          liveBrands.forEach(lb => {
-            const lbName = lb.name.trim().toLowerCase();
-            for (const [id, b] of currentBrandMap.entries()) {
-              if (id.startsWith('br-') && b.name.trim().toLowerCase() === lbName) {
-                currentBrandMap.delete(id);
-              }
-            }
-            currentBrandMap.set(lb.id, lb);
-          });
-
-          // Ensure no deleted brands sneak in
-          deletedBrandIds.forEach(id => currentBrandMap.delete(id));
-
-          const mergedBrands = Array.from(currentBrandMap.values());
-          this.brandsSignal.set(mergedBrands);
-          this.persistBrands(mergedBrands);
+            const mergedBrands = Array.from(currentBrandMap.values());
+            this.brandsSignal.set(mergedBrands);
+            this.persistBrands(mergedBrands);
+            brandsCount = mergedBrands.length;
+            hasSuccess = true;
+          }
         }
+      } catch (e) {
+        console.warn('Live sync brands warning:', e);
       }
 
       // 3. Sync products
-      const prodRes = await fetchWithTimeout(getApiUrl('/products?pageSize=100'), {}, 15000);
-      if (prodRes.ok) {
-        const prodData = await prodRes.json();
-        const items = prodData.data?.items || prodData.data;
-        if (Array.isArray(items)) {
-          const deletedProdIds = this.getDeletedProductIds();
-          const demoSkus = new Set(['NPO-GNO-001', 'NPO-VCO-002', 'NPO-SES-003', 'VG-LMP-004', 'VG-LMP-005', 'NPO-CAKE-005', 'NPO-CAS-004']);
-          const liveProds: Product[] = items
-            .filter((p: any) => !deletedProdIds.has(p.id) && !p.id?.startsWith?.('prod-') && !demoSkus.has(p.sku))
-            .map((p: any) => this.mapDtoToProduct(p));
+      try {
+        const prodRes = await fetchWithTimeout(getApiUrl('/products?pageSize=100'), {}, 20000);
+        if (prodRes.ok) {
+          const prodData = await prodRes.json();
+          const items = prodData.data?.items || prodData.data;
+          if (Array.isArray(items)) {
+            const deletedProdIds = this.getDeletedProductIds();
+            const demoSkus = new Set(['NPO-GNO-001', 'NPO-VCO-002', 'NPO-SES-003', 'VG-LMP-004', 'VG-LMP-005', 'NPO-CAKE-005', 'NPO-CAS-004']);
+            const liveProds: Product[] = items
+              .filter((p: any) => !deletedProdIds.has(p.id) && !p.id?.startsWith?.('prod-') && !demoSkus.has(p.sku))
+              .map((p: any) => this.mapDtoToProduct(p));
 
-          this.productsSignal.set(liveProds);
-          this.persistProducts(liveProds);
+            this.productsSignal.set(liveProds);
+            this.persistProducts(liveProds);
+            prodsCount = liveProds.length;
+            hasSuccess = true;
+          }
         }
+      } catch (e) {
+        console.warn('Live sync products warning:', e);
       }
+
+      return {
+        success: hasSuccess,
+        categoriesCount: catsCount || this.categoriesSignal().length,
+        brandsCount: brandsCount || this.brandsSignal().length,
+        productsCount: prodsCount || this.productsSignal().length
+      };
     } catch (err) {
       console.warn('Could not sync products/categories from backend, using persisted state:', err);
+      return {
+        success: false,
+        categoriesCount: this.categoriesSignal().length,
+        brandsCount: this.brandsSignal().length,
+        productsCount: this.productsSignal().length
+      };
+    } finally {
+      this.isSyncing.set(false);
     }
   }
 

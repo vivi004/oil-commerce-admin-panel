@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../../core/services/product.service';
+import { LiveSyncService } from '../../../core/services/live-sync.service';
 import { Product } from '../../../core/models/app.models';
 import { ProductStatus } from '../../../core/enums/app.enums';
 import { DataTableComponent, ColumnDef } from '../../../shared/components/data-table/data-table.component';
@@ -32,11 +33,12 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
           <button
             type="button"
             (click)="refreshCatalog()"
-            class="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs"
+            [disabled]="liveSyncService.isSyncing()"
+            class="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-60"
             title="Sync products with backend and storefront"
           >
-            <span class="material-symbols-outlined text-[16px]">sync</span>
-            <span>Sync Live</span>
+            <span class="material-symbols-outlined text-[16px]" [ngClass]="{'animate-spin text-amber-500': liveSyncService.isSyncing()}">sync</span>
+            <span>{{ liveSyncService.isSyncing() ? 'Syncing...' : 'Sync Live' }}</span>
           </button>
           <a
             routerLink="/tenant-admin/products/new"
@@ -193,6 +195,7 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
 })
 export class ProductListComponent {
   productService = inject(ProductService);
+  readonly liveSyncService = inject(LiveSyncService);
 
   readonly ProductStatus = ProductStatus;
 
@@ -249,8 +252,8 @@ export class ProductListComponent {
     this.searchQuery.set(q);
   }
 
-  refreshCatalog(): void {
-    this.productService.syncFromBackend();
+  async refreshCatalog(): Promise<void> {
+    await this.liveSyncService.syncCatalog();
   }
 
   onImgError(e: Event): void {

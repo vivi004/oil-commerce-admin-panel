@@ -1,6 +1,7 @@
 import { Component, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { OrderService } from '../../../core/services/order.service';
+import { LiveSyncService } from '../../../core/services/live-sync.service';
 import { PaymentTransaction } from '../../../core/models/app.models';
 import { DataTableComponent, ColumnDef } from '../../../shared/components/data-table/data-table.component';
 import { BadgeComponent } from '../../../shared/components/badge/badge.component';
@@ -15,6 +16,18 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
         <div>
           <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Payments & Ledger</h1>
           <p class="text-xs text-slate-500 dark:text-slate-400">Gateway transactions via Razorpay, UPI, Direct Bank Transfer & COD.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="syncLive()"
+            [disabled]="liveSyncService.isSyncing()"
+            class="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-60"
+            title="Sync payments and orders live"
+          >
+            <span class="material-symbols-outlined text-[16px]" [ngClass]="{'animate-spin text-amber-500': liveSyncService.isSyncing()}">sync</span>
+            <span>{{ liveSyncService.isSyncing() ? 'Syncing...' : 'Sync Live' }}</span>
+          </button>
         </div>
       </div>
 
@@ -67,6 +80,11 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
 })
 export class PaymentListComponent {
   private orderService = inject(OrderService);
+  readonly liveSyncService = inject(LiveSyncService);
+
+  async syncLive(): Promise<void> {
+    await this.liveSyncService.syncOrders();
+  }
 
   constructor() {
     this.orderService.purgeDemoOrders();

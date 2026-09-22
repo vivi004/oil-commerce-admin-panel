@@ -2,6 +2,7 @@ import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ProductService } from '../../../core/services/product.service';
 import { OrderService } from '../../../core/services/order.service';
+import { LiveSyncService } from '../../../core/services/live-sync.service';
 import { ExportService } from '../../../core/services/export.service';
 import { DataTableComponent, ColumnDef } from '../../../shared/components/data-table/data-table.component';
 
@@ -17,6 +18,17 @@ import { DataTableComponent, ColumnDef } from '../../../shared/components/data-t
           <p class="text-xs text-slate-500 dark:text-slate-400">Volume extracted in Liters & Kg, revenue share per seed category, and best-selling SKU velocity.</p>
         </div>
         <div class="flex items-center gap-2">
+          <button
+            type="button"
+            (click)="syncLive()"
+            [disabled]="liveSyncService.isSyncing()"
+            class="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-60"
+            title="Sync analytics and sales metrics live"
+          >
+            <span class="material-symbols-outlined text-[16px]" [ngClass]="{'animate-spin text-amber-500': liveSyncService.isSyncing()}">sync</span>
+            <span>{{ liveSyncService.isSyncing() ? 'Syncing...' : 'Sync Live' }}</span>
+          </button>
+
           <button
             type="button"
             (click)="exportActiveReport()"
@@ -156,7 +168,12 @@ export class TenantReportsComponent {
   productService = inject(ProductService);
   orderService = inject(OrderService);
   exportService = inject(ExportService);
+  readonly liveSyncService = inject(LiveSyncService);
   Math = Math;
+
+  async syncLive(): Promise<void> {
+    await this.liveSyncService.syncAll();
+  }
 
   activeTab = signal<'skus' | 'categories'>('skus');
   skuSearch = signal<string>('');

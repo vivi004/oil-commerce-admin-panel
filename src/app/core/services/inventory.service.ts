@@ -32,13 +32,16 @@ export class InventoryService {
 
   readonly movements = this.movementsSignal.asReadonly();
 
+  readonly isSyncing = signal<boolean>(false);
+
   constructor(private productService: ProductService) {
     this.syncMovementsFromBackend();
   }
 
-  private async syncMovementsFromBackend(): Promise<void> {
+  async syncMovementsFromBackend(): Promise<boolean> {
+    this.isSyncing.set(true);
     try {
-      const res = await fetchWithTimeout(getApiUrl('/inventory/movements'));
+      const res = await fetchWithTimeout(getApiUrl('/inventory/movements'), {}, 20000);
       if (res.ok) {
         const result = await res.json();
         if (result.success && Array.isArray(result.data) && result.data.length > 0) {
@@ -60,10 +63,15 @@ export class InventoryService {
           }));
           this.movementsSignal.set(mapped);
           this.persistMovements(mapped);
+          return true;
         }
       }
+      return false;
     } catch (e) {
       console.warn('Backend /inventory/movements offline, relying on cached data:', e);
+      return false;
+    } finally {
+      this.isSyncing.set(false);
     }
   }
 

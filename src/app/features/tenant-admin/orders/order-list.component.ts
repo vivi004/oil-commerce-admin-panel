@@ -2,6 +2,7 @@ import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { OrderService } from '../../../core/services/order.service';
+import { LiveSyncService } from '../../../core/services/live-sync.service';
 import { ExportService } from '../../../core/services/export.service';
 import { Order } from '../../../core/models/app.models';
 import { OrderStatus } from '../../../core/enums/app.enums';
@@ -22,6 +23,18 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
           <p class="text-xs text-slate-500 dark:text-slate-400">Process online oil orders, assign tracking numbers, and print GST tax invoices.</p>
         </div>
         <div class="flex items-center gap-2 w-full sm:w-auto">
+          <!-- Sync Live -->
+          <button
+            type="button"
+            (click)="syncLive()"
+            [disabled]="liveSyncService.isSyncing()"
+            class="w-full sm:w-auto justify-center px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-60"
+            title="Sync orders pipeline with live backend"
+          >
+            <span class="material-symbols-outlined text-[16px]" [ngClass]="{'animate-spin text-amber-500': liveSyncService.isSyncing()}">sync</span>
+            <span>{{ liveSyncService.isSyncing() ? 'Syncing...' : 'Sync Live' }}</span>
+          </button>
+
           <button
             type="button"
             (click)="exportOrders()"
@@ -334,11 +347,16 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
 export class OrderListComponent {
   orderService = inject(OrderService);
   exportService = inject(ExportService);
+  readonly liveSyncService = inject(LiveSyncService);
 
   readonly OrderStatus = OrderStatus;
 
   searchQuery = signal<string>('');
   statusFilter = signal<string>('ALL');
+
+  async syncLive(): Promise<void> {
+    await this.liveSyncService.syncOrders();
+  }
 
   isStatusModalOpen = signal<boolean>(false);
   isInvoiceModalOpen = signal<boolean>(false);

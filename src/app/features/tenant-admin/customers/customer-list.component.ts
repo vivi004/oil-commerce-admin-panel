@@ -10,6 +10,7 @@ import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialo
 import { CustomerService } from '../../../core/services/customer.service';
 import { ExportService } from '../../../core/services/export.service';
 import { OrderService } from '../../../core/services/order.service';
+import { LiveSyncService } from '../../../core/services/live-sync.service';
 
 type CustomerFilterType = 'ALL' | 'LIVE' | 'B2B' | 'REPEAT';
 
@@ -534,10 +535,11 @@ export class CustomerListComponent implements OnInit {
   customerService = inject(CustomerService);
   private exportService = inject(ExportService);
   private orderService = inject(OrderService);
+  readonly liveSyncService = inject(LiveSyncService);
 
   searchQuery = signal<string>('');
   filterType = signal<CustomerFilterType>('ALL');
-  isSyncing = signal<boolean>(false);
+  isSyncing = this.liveSyncService.isSyncing;
 
   // Modals state
   isDetailModalOpen = signal<boolean>(false);
@@ -610,14 +612,7 @@ export class CustomerListComponent implements OnInit {
   }
 
   async refresh(): Promise<void> {
-    this.isSyncing.set(true);
-    try {
-      this.orderService.fetchOrdersFromBackend();
-      this.customerService.syncWithOrders();
-      await this.customerService.fetchBackendCustomers();
-    } finally {
-      this.isSyncing.set(false);
-    }
+    await this.liveSyncService.syncCustomers();
   }
 
   isB2B(c: Customer): boolean {

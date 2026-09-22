@@ -4,6 +4,7 @@ import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { Role } from '../../core/enums/role.enum';
 import { TenantService } from '../../core/services/tenant.service';
+import { LiveSyncService } from '../../core/services/live-sync.service';
 
 interface NavItem {
   label: string;
@@ -194,6 +195,20 @@ interface NavSection {
               </div>
             </div>
 
+            <!-- Global Sync Live Action -->
+            <button
+              type="button"
+              (click)="triggerLiveSync()"
+              [disabled]="liveSyncService.isSyncing()"
+              class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg border transition-all disabled:opacity-60"
+              [ngClass]="liveSyncService.isSyncing() ? 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400' : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'"
+              title="Sync live changes across all pages"
+            >
+              <span class="material-symbols-outlined text-[16px]" [ngClass]="{'animate-spin text-amber-500': liveSyncService.isSyncing()}">sync</span>
+              <span class="font-bold">{{ liveSyncService.isSyncing() ? 'Syncing...' : 'Sync Live' }}</span>
+              <span class="w-2 h-2 rounded-full shrink-0" [ngClass]="liveSyncService.isSyncing() ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'"></span>
+            </button>
+
             <!-- Dark Mode Toggle -->
             <button
               type="button"
@@ -261,6 +276,26 @@ interface NavSection {
           </div>
         </header>
 
+        <!-- Floating Live Sync Notification Banner -->
+        <div 
+          *ngIf="liveSyncService.syncFeedback()" 
+          class="fixed top-20 right-4 sm:right-8 z-50 max-w-md p-3.5 rounded-2xl shadow-2xl border flex items-center justify-between gap-3 text-xs animate-in slide-in-from-top-3 duration-200 backdrop-blur-md"
+          [ngClass]="liveSyncService.syncFeedback()?.type === 'success' 
+            ? 'bg-slate-900/95 text-emerald-300 border-emerald-500/50 shadow-emerald-950/30' 
+            : 'bg-rose-950/95 text-rose-200 border-rose-500/50 shadow-rose-950/30'"
+        >
+          <div class="flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-[20px] shrink-0"
+              [ngClass]="liveSyncService.syncFeedback()?.type === 'success' ? 'text-emerald-400' : 'text-rose-400'">
+              {{ liveSyncService.syncFeedback()?.type === 'success' ? 'cloud_done' : 'error' }}
+            </span>
+            <span class="font-medium text-white">{{ liveSyncService.syncFeedback()?.message }}</span>
+          </div>
+          <button type="button" (click)="liveSyncService.clearFeedback()" class="text-white/60 hover:text-white shrink-0 p-1">
+            <span class="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+
         <!-- ROUTER OUTLET CONTAINER -->
         <main class="flex-1 p-3 sm:p-5 lg:p-8 max-w-7xl w-full mx-auto min-w-0 overflow-x-hidden">
           <router-outlet></router-outlet>
@@ -273,6 +308,11 @@ export class AdminLayoutComponent {
   private authService = inject(AuthService);
   private tenantService = inject(TenantService);
   private router = inject(Router);
+  readonly liveSyncService = inject(LiveSyncService);
+
+  triggerLiveSync(): void {
+    this.liveSyncService.syncAll();
+  }
 
   isSidebarCollapsed = signal<boolean>(false);
   isMobileSidebarOpen = signal<boolean>(false);

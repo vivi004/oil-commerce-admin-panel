@@ -12,6 +12,7 @@ const ORDERS_STORAGE_KEY = 'nisha_admin_orders_v1';
 export class OrderService {
   private ordersSignal = signal<Order[]>(this.loadInitialOrders());
   private isFetching = false;
+  readonly isSyncing = signal<boolean>(false);
 
   // Expose readable signal
   readonly orders = this.ordersSignal.asReadonly();
@@ -135,12 +136,13 @@ export class OrderService {
     }
   }
 
-  async fetchOrdersFromBackend(): Promise<void> {
-    if (this.isFetching) return;
+  async fetchOrdersFromBackend(): Promise<boolean> {
+    if (this.isFetching) return false;
     this.isFetching = true;
+    this.isSyncing.set(true);
 
     try {
-      let token = localStorage.getItem('nisha_admin_token');
+      let token = typeof window !== 'undefined' ? localStorage.getItem('nisha_admin_token') : null;
 
       // If token not yet present, attempt background login using default admin
       if (!token) {
@@ -149,12 +151,14 @@ export class OrderService {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: 'admin@nishapureoils.com', password: 'Admin@123' })
-          }, 1200);
+          }, 15000);
           if (authRes.ok) {
             const authData = await authRes.json();
             if (authData.success && authData.data?.accessToken) {
               token = authData.data.accessToken;
-              localStorage.setItem('nisha_admin_token', token as string);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('nisha_admin_token', token as string);
+              }
             }
           }
         } catch {
@@ -163,15 +167,14 @@ export class OrderService {
       }
 
       if (!token) {
-        this.isFetching = false;
-        return;
+        return false;
       }
 
       const res = await fetchWithTimeout(getApiUrl('/admin/orders?page=1&pageSize=100'), {
         headers: {
           Authorization: `Bearer ${token}`
         }
-      }, 1500);
+      }, 20000);
 
       if (res.ok) {
         const json = await res.json();
@@ -187,12 +190,16 @@ export class OrderService {
           const merged = [...backendOrders, ...remainingLocal];
           this.ordersSignal.set(merged);
           this.persistOrders(merged);
+          return true;
         }
       }
+      return false;
     } catch (e) {
       console.warn('Could not sync orders from backend, relying on cached/local orders', e);
+      return false;
     } finally {
       this.isFetching = false;
+      this.isSyncing.set(false);
     }
   }
 
