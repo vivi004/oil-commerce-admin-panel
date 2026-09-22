@@ -509,6 +509,7 @@ export class ProductService {
       sku: p.sku || 'NPO-PROD',
       barcode: p.barcode || '890123456789',
       description: p.description || '',
+      extractionMethod: p.extractionMethod || 'Wood-Churned Cold-Pressed',
       benefits: p.benefits ? (Array.isArray(p.benefits) ? p.benefits.join('. ') : p.benefits) : '',
       ingredients: p.ingredients || '100% Cold Pressed Seeds',
       storageInstructions: p.storageInstructions || 'Store in cool, dry place away from sunlight',
@@ -820,6 +821,7 @@ export class ProductService {
       thumbnail: primaryImage,
       categoryId,
       brandId,
+      extractionMethod: productData.extractionMethod || 'Wood-Churned Cold-Pressed',
       status: productData.status || ProductStatus.ACTIVE,
       benefits: productData.benefits
         ? (Array.isArray(productData.benefits) ? productData.benefits : productData.benefits.split('.').map((s: string) => s.trim()).filter(Boolean))

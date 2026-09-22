@@ -103,6 +103,7 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
                 <div>
                   <div class="text-xs font-bold">{{ prod.name }}</div>
                   <div class="text-[10px] text-slate-400 font-mono">{{ prod.sku }} • {{ prod.brand }}</div>
+                  <div *ngIf="prod.extractionMethod" class="text-[9.5px] text-amber-600 dark:text-amber-400 font-semibold">{{ prod.extractionMethod }}</div>
                 </div>
               </div>
             </td>

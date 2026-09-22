@@ -140,6 +140,25 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
             </div>
 
             <div>
+              <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Extraction &amp; Processing Method *</label>
+              <select
+                formControlName="extractionMethod"
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
+              >
+                <option value="Wood-Churned Cold-Pressed">Wood-Churned Cold-Pressed (Marachekku)</option>
+                <option value="Cold-Pressed Virgin Copra">Cold-Pressed Virgin Copra</option>
+                <option value="Wood-Churned with Palm Jaggery">Wood-Churned with Palm Jaggery</option>
+                <option value="Pure Cold-Pressed Ricinus">Pure Cold-Pressed Ricinus</option>
+                <option value="Organic Cold-Pressed Neem Seed">Organic Cold-Pressed Neem Seed</option>
+                <option value="Forest-Sourced Iluppai Press">Forest-Sourced Iluppai Press</option>
+                <option value="Pancha Deepam 5-Oil Blend">Pancha Deepam 5-Oil Blend (Puja Fuel)</option>
+                <option value="Refined High-Smoke Point">Refined High-Smoke Point (Sunflower)</option>
+                <option value="Refined Culinary Palm Olein">Refined Culinary Palm Olein (Palm)</option>
+                <option value="Traditional Multi-Seed Blend">Traditional Multi-Seed Blend (Edible)</option>
+              </select>
+            </div>
+
+            <div>
               <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Product Status</label>
               <select
                 formControlName="status"
@@ -333,6 +352,7 @@ export class ProductFormComponent implements OnInit {
     brand: ['Nisha Pure Oils', Validators.required],
     category: ['', Validators.required],
     sku: ['', Validators.required],
+    extractionMethod: ['Wood-Churned Cold-Pressed'],
     status: [ProductStatus.ACTIVE, Validators.required],
     description: ['100% traditional wood-pressed cold extraction preserving natural aroma, taste, and vital nutrients.'],
     benefits: ['Cholesterol-free, 100% natural, Mara Chekku traditional cold-press method'],
@@ -432,6 +452,7 @@ export class ProductFormComponent implements OnInit {
       brand: prod.brand,
       category: prod.category,
       sku: prod.sku,
+      extractionMethod: prod.extractionMethod || 'Wood-Churned Cold-Pressed',
       status: prod.status,
       description: prod.description,
       benefits: prod.benefits,
@@ -534,6 +555,7 @@ export class ProductFormComponent implements OnInit {
           brand: val.brand,
           category: val.category,
           sku: val.sku,
+          extractionMethod: val.extractionMethod,
           status: val.status,
           description: val.description,
           benefits: val.benefits,
@@ -548,6 +570,7 @@ export class ProductFormComponent implements OnInit {
           brand: val.brand,
           category: val.category,
           sku: val.sku,
+          extractionMethod: val.extractionMethod,
           barcode: `890100${Date.now().toString().slice(-6)}`,
           status: val.status,
           description: val.description,

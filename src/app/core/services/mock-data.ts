@@ -3,26 +3,24 @@ import { OrderStatus, ProductStatus, StockMovementType, TenantStatus, Subscripti
 import { Role } from '../enums/role.enum';
 
 export const INITIAL_CATEGORIES: Category[] = [
-  { id: 'cat-groundnut', name: 'Groundnut Oil', slug: 'groundnut-oil', description: 'Traditional wood-pressed Kadalai Ennai', isActive: true, productCount: 4 },
-  { id: 'cat-coconut', name: 'Coconut Oil', slug: 'coconut-oil', description: 'Pure virgin cold-pressed Thengai Ennai', isActive: true, productCount: 3 },
-  { id: 'cat-sesame', name: 'Sesame Oil (Gingelly Oil)', slug: 'sesame-oil', description: 'Traditional Nalla Ennai with palm jaggery', isActive: true, productCount: 3 },
-  { id: 'cat-castor', name: 'Castor Oil', slug: 'castor-oil', description: 'Pure thick cold-pressed Amanakku Ennai', isActive: true, productCount: 2 },
-  { id: 'cat-lamp', name: 'Lamp Oil (Puja Oil)', slug: 'lamp-oil', description: 'Pancha Deepa sacred divine puja oil', isActive: true, productCount: 3 },
-  { id: 'cat-neem', name: 'Neem Oil', slug: 'neem-oil', description: 'Organic botanical cold-pressed neem seed oil', isActive: true, productCount: 1 },
-  { id: 'cat-mahua', name: 'Mahua Oil', slug: 'mahua-oil', description: 'Heritage Iluppai Ennai for temple lamps & massage', isActive: true, productCount: 1 },
-  { id: 'cat-palm', name: 'Palm Oil', slug: 'palm-oil', description: 'Refined palm oil for high-heat culinary uses', isActive: true, productCount: 1 },
+  { id: '57c98031-de6f-4a17-9d72-711c9da67eb2', name: 'Groundnut Oil', slug: 'groundnut-oil', description: 'Traditional wood-pressed Kadalai Ennai', isActive: true, productCount: 1 },
+  { id: '2f137c8c-f615-459f-8fe5-fb73138ca0a5', name: 'Coconut Oil', slug: 'coconut-oil', description: 'Pure virgin cold-pressed Thengai Ennai', isActive: true, productCount: 1 },
+  { id: 'fdfa197f-56b5-427e-9551-720dc50fdb28', name: 'Sesame Oil (Gingelly)', slug: 'sesame-oil', description: 'Traditional Nalla Ennai with palm jaggery', isActive: true, productCount: 1 },
+  { id: 'db8abdb3-00ea-4891-aa9c-5bf75450a68c', name: 'Castor Oil', slug: 'castor-oil', description: 'Pure thick cold-pressed Amanakku Ennai', isActive: true, productCount: 1 },
+  { id: '995bbae7-ac91-4509-8aad-1bff2ee87476', name: 'Lamp Oil (Puja Oil)', slug: 'lamp-oil', description: 'Pancha Deepam sacred divine puja oil', isActive: true, productCount: 1 },
+  { id: '86c7b428-cc73-4c81-815b-a6d425608769', name: 'Neem Oil', slug: 'neem-oil', description: 'Organic botanical cold-pressed neem seed oil', isActive: true, productCount: 1 },
+  { id: '13cf0449-48a8-42b5-88ea-ffa8caf52af7', name: 'Mahua Oil (Iluppai)', slug: 'mahua-oil', description: 'Heritage Iluppai Ennai for temple lamps & massage', isActive: true, productCount: 1 },
+  { id: '78a9f143-a3e0-4965-aa72-706f0c458d28', name: 'Palm Oil', slug: 'palm-oil', description: 'Refined culinary palm olein for high-heat cooking', isActive: true, productCount: 1 },
   { id: '2697bded-5084-429d-a6ac-f49116d4c80f', name: 'Sunflower Oil', slug: 'sunflower-oil', description: 'Pure cold-pressed organic sunflower seed oil rich in Vitamin E', isActive: true, productCount: 1 },
-  { id: 'b56c1d04-c1b5-48f8-a026-54aea8cfefcc', name: 'Edible Oil', slug: 'edible-oil', description: 'Premium multi-seed traditional cold-pressed edible cooking oils', isActive: true, productCount: 1 },
-  { id: 'cat-burfi', name: 'Burfi', slug: 'burfi', description: 'Pure jaggery peanut chikki & traditional burfi', isActive: true, productCount: 2 },
-  { id: 'cat-oil-cake', name: 'Oil Cake', slug: 'oil-cake', description: 'High-protein livestock cattle feed cake', isActive: true, productCount: 2 }
+  { id: 'b56c1d04-c1b5-48f8-a026-54aea8cfefcc', name: 'Edible Oil', slug: 'edible-oil', description: 'Premium multi-seed traditional cold-pressed edible cooking oils', isActive: true, productCount: 1 }
 ];
 
 export const INITIAL_BRANDS: Brand[] = [
-  { id: 'be77a6d8-3045-476c-ab40-51d1d8fdd0f0', name: 'Nisha Pure Oils', description: '100% Traditional Vaagai Wood Churned Cold-Pressed Oils', isActive: true, productCount: 12 },
-  { id: '6bd89be4-a7c9-4093-8991-3149f7e31886', name: 'Roshini Gold', description: 'Premium wood-churned pure traditional cooking oils', isActive: true, productCount: 2 },
-  { id: '71a030aa-b37f-4a69-80a9-f88c2670cc3d', name: 'Rosi Gold', description: 'Pure wood-pressed cooking oils and healthy kitchen commodities', isActive: true, productCount: 1 },
-  { id: 'br-varshini', name: 'Varshini Gold', description: 'Premium Filtered & Puja Oil Speciality Line', isActive: true, productCount: 6 },
-  { id: 'br-other', name: 'Other Brands', description: 'Third-party agro partner commodities', isActive: true, productCount: 2 }
+  { id: 'be77a6d8-3045-476c-ab40-51d1d8fdd0f0', name: 'Nisha Pure Oils', description: '100% Traditional Vaagai Wood Churned & Cold-Pressed Virgin Oils (Groundnut, Coconut, Sesame, Castor, Neem, Mahua, Lamp)', isActive: true, productCount: 7 },
+  { id: '6bd89be4-a7c9-4093-8991-3149f7e31886', name: 'Roshini Gold', description: 'High-Heat Culinary Cooking Label formulated for high heat stability (Sunflower Oil)', isActive: true, productCount: 1 },
+  { id: '71a030aa-b37f-4a69-80a9-f88c2670cc3d', name: 'Rosi Gold', description: 'Wholesome Kitchen & Frying Commodities Label (Palm Oil)', isActive: true, productCount: 1 },
+  { id: 'dc435e49-76ab-4be5-a8e2-47c5b0567a9d', name: 'Varshini Gold', description: 'Premium Multi-Seed Culinary & Gold Standard Blends (Edible Oil)', isActive: true, productCount: 1 },
+  { id: 'br-other', name: 'Other Brands', description: 'Third-party agro partner commodities', isActive: true, productCount: 0 }
 ];
 
 export const INITIAL_PRODUCTS: Product[] = [];

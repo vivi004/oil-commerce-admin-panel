@@ -26,7 +26,7 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Oil Brands & Labels</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Manage cold-pressed oil house brands (Nisha Pure Oils, Varshini Gold) and catalog SKUs.</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Manage cold-pressed & culinary oil house brands (Nisha Pure Oils, Roshini Gold, Rosi Gold, Varshini Gold) and catalog SKUs.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <!-- View Switcher -->
@@ -96,7 +96,7 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
                   </div>
                   <div>
                     <div class="text-xs font-bold">{{ brand.name }}</div>
-                    <div class="text-[10px] text-slate-400">Cold-Pressed House Label</div>
+                    <div class="text-[10px] text-slate-400">{{ getBrandType(brand.name) }}</div>
                   </div>
                 </div>
               </td>
@@ -290,13 +290,30 @@ export class BrandListComponent {
 
   filteredBrands = computed(() => {
     const list = this.productService.brands();
+    const products = this.productService.products();
     const query = this.searchQuery().toLowerCase().trim();
-    if (!query) return list;
-    return list.filter(b =>
+    const withCounts = list.map(b => {
+      const count = products.filter(p =>
+        p.brand?.trim().toLowerCase() === b.name?.trim().toLowerCase() ||
+        (p as any).brandId === b.id
+      ).length;
+      return { ...b, productCount: count > 0 ? count : (b.productCount || 0) };
+    });
+    if (!query) return withCounts;
+    return withCounts.filter(b =>
       b.name.toLowerCase().includes(query) ||
       b.description.toLowerCase().includes(query)
     );
   });
+
+  getBrandType(name: string): string {
+    const lower = (name || '').toLowerCase();
+    if (lower.includes('nisha')) return '100% Cold-Pressed Heritage Label';
+    if (lower.includes('roshini')) return 'Culinary Sunflower Cooking Label';
+    if (lower.includes('rosi')) return 'Culinary Palm Olein Label';
+    if (lower.includes('varshini')) return 'Multi-Seed Edible Blend Label';
+    return 'Oil House Label';
+  }
 
   brandForm: FormGroup = this.fb.group({
     name: ['', Validators.required],

@@ -90,6 +90,7 @@ export interface Product {
   sku: string;
   barcode: string;
   description: string;
+  extractionMethod?: string;
   benefits?: string;
   ingredients?: string;
   storageInstructions?: string;
