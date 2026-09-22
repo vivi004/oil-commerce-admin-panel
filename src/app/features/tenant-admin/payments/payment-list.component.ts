@@ -68,19 +68,47 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
 export class PaymentListComponent {
   private orderService = inject(OrderService);
 
+  constructor() {
+    this.orderService.purgeDemoOrders();
+  }
+
+  private isDemoPayment(p: PaymentTransaction): boolean {
+    if (!p) return true;
+    const demoTxns = new Set(['pay_rzp_89492819', 'pay_rzp_99182341', 'pay_rzp_10293847', 'pay_cod_55219481']);
+    const demoOrders = new Set(['NPO-2025-8841', 'NPO-2025-8842', 'NPO-2025-8843', 'NPO-8841', 'NPO-8842', 'NPO-8843']);
+    const demoCustomers = ['anandapadmanabhan', 'deepa meenakshi', 'karthikeyan', 'kavitha', 'suresh'];
+
+    if (demoTxns.has(p.gatewayTransactionId)) return true;
+    if (demoOrders.has(p.orderNumber) || p.orderNumber?.startsWith('NPO-2025-')) return true;
+    const cust = (p.customerName || '').toLowerCase();
+    if (demoCustomers.some(d => cust.includes(d))) return true;
+    return false;
+  }
+
   payments = computed<PaymentTransaction[]>(() => {
-    return this.orderService.orders().map(o => ({
-      id: `pay-${o.id}`,
-      orderId: o.id,
-      orderNumber: o.orderNumber,
-      customerName: o.customerName || 'Store Customer',
-      amount: o.grandTotal,
-      paymentMethod: o.paymentMethod || 'Online Payment',
-      gatewayTransactionId: o.trackingNumber || `txn_${o.id}`,
-      status: o.paymentStatus === 'PAID' ? 'SUCCESS' : o.paymentStatus === 'FAILED' ? 'FAILED' : 'PENDING',
-      settlementStatus: o.paymentStatus === 'PAID' ? 'SETTLED' : 'PENDING',
-      createdAt: o.createdAt
-    }));
+    return this.orderService.orders()
+      .filter(o => !this.orderService.isDemoOrder(o))
+      .map(o => {
+        const status: 'SUCCESS' | 'PENDING' | 'FAILED' | 'REFUNDED' =
+          o.paymentStatus === 'PAID' ? 'SUCCESS' : o.paymentStatus === 'FAILED' ? 'FAILED' : o.paymentStatus === 'REFUNDED' ? 'REFUNDED' : 'PENDING';
+        const settlementStatus: 'SETTLED' | 'PENDING' | 'PROCESSING' =
+          o.paymentStatus === 'PAID' ? 'SETTLED' : 'PENDING';
+
+        const tx: PaymentTransaction = {
+          id: `pay-${o.id}`,
+          orderId: o.id,
+          orderNumber: o.orderNumber,
+          customerName: o.customerName || 'Store Customer',
+          amount: o.grandTotal,
+          paymentMethod: o.paymentMethod || 'Online Payment',
+          gatewayTransactionId: o.trackingNumber || `txn_${o.id}`,
+          status,
+          settlementStatus,
+          createdAt: o.createdAt
+        };
+        return tx;
+      })
+      .filter(p => !this.isDemoPayment(p));
   });
   searchQuery = signal<string>('');
 
@@ -95,9 +123,10 @@ export class PaymentListComponent {
   ];
 
   filteredPayments = computed(() => {
+    const valid = this.payments();
     const q = this.searchQuery().toLowerCase().trim();
-    if (!q) return this.payments();
-    return this.payments().filter(p =>
+    if (!q) return valid;
+    return valid.filter(p =>
       p.gatewayTransactionId.toLowerCase().includes(q) ||
       p.orderNumber.toLowerCase().includes(q) ||
       p.customerName.toLowerCase().includes(q) ||
