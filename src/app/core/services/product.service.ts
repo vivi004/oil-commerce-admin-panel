@@ -532,19 +532,23 @@ export class ProductService {
   }
 
   async ensureCategoryUuid(categoryNameOrId?: string, existingCategoryId?: string): Promise<string | null> {
-    if (existingCategoryId && this.isUuid(existingCategoryId)) {
-      return existingCategoryId;
+    const raw = (categoryNameOrId || '').trim();
+    if (this.isUuid(raw)) {
+      return raw;
     }
-    const name = (categoryNameOrId || '').trim();
+
+    const name = raw;
     if (!name) {
+      if (existingCategoryId && this.isUuid(existingCategoryId)) {
+        return existingCategoryId;
+      }
       return this.categoriesSignal().find(c => this.isUuid(c.id))?.id || null;
     }
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-    // 1. Check if category with valid UUID already exists in local signal
+    // 1. Check if category with this name or slug already exists in local signal with a valid UUID
     const existingCat = this.categoriesSignal().find(c =>
-      (existingCategoryId && c.id === existingCategoryId) ||
       c.id === name ||
       c.name?.trim().toLowerCase() === name.toLowerCase() ||
       c.slug?.trim().toLowerCase() === slug
@@ -622,23 +626,27 @@ export class ProductService {
       console.warn('Could not auto-create category on backend:', err);
     }
 
-    // 4. Fallback to existing UUID category if backend fails
+    if (existingCat && this.isUuid(existingCat.id)) return existingCat.id;
     const anyUuidCat = this.categoriesSignal().find(c => this.isUuid(c.id));
     return anyUuidCat ? anyUuidCat.id : (existingCat?.id || null);
   }
 
   async ensureBrandUuid(brandNameOrId?: string, existingBrandId?: string): Promise<string | null> {
-    if (existingBrandId && this.isUuid(existingBrandId)) {
-      return existingBrandId;
+    const raw = (brandNameOrId || '').trim();
+    if (this.isUuid(raw)) {
+      return raw;
     }
-    const name = (brandNameOrId || '').trim();
+
+    const name = raw;
     if (!name) {
+      if (existingBrandId && this.isUuid(existingBrandId)) {
+        return existingBrandId;
+      }
       return this.brandsSignal().find(b => this.isUuid(b.id))?.id || null;
     }
 
-    // 1. Check if brand already has a valid UUID in local signal
+    // 1. Check if brand already has a valid UUID in local signal matching the name
     const existingBrand = this.brandsSignal().find(b =>
-      (existingBrandId && b.id === existingBrandId) ||
       b.id === name ||
       b.name?.trim().toLowerCase() === name.toLowerCase()
     );
@@ -712,6 +720,7 @@ export class ProductService {
       console.warn('Could not auto-create brand on backend:', err);
     }
 
+    if (existingBrand && this.isUuid(existingBrand.id)) return existingBrand.id;
     const anyUuidBrand = this.brandsSignal().find(b => this.isUuid(b.id));
     return anyUuidBrand ? anyUuidBrand.id : (existingBrand?.id || null);
   }
