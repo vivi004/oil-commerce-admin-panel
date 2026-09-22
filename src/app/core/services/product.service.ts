@@ -218,6 +218,18 @@ export class ProductService {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           let list: Category[] = parsed.filter(c => !deleted.has(c.id));
+          
+          // Always ensure new INITIAL_CATEGORIES (like Sunflower Oil, Edible Oil) are present in cached list
+          const existingNames = new Set(list.map(c => c.name.trim().toLowerCase()));
+          const existingSlugs = new Set(list.map(c => c.slug.trim().toLowerCase()));
+          for (const initCat of INITIAL_CATEGORIES) {
+            if (!deleted.has(initCat.id) &&
+                !existingNames.has(initCat.name.trim().toLowerCase()) &&
+                !existingSlugs.has(initCat.slug.trim().toLowerCase())) {
+              list.push(initCat);
+            }
+          }
+
           const uuidSlugs = new Set(
             list.filter(c => this.isUuid(c.id)).map(c => c.slug.toLowerCase())
           );
@@ -242,6 +254,15 @@ export class ProductService {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           let list: Brand[] = parsed.filter(b => !deleted.has(b.id));
+          
+          // Always ensure new INITIAL_BRANDS (like Roshini Gold, Rosi Gold) are present in cached list
+          const existingBrandNames = new Set(list.map(b => b.name.trim().toLowerCase()));
+          for (const initBrand of INITIAL_BRANDS) {
+            if (!deleted.has(initBrand.id) && !existingBrandNames.has(initBrand.name.trim().toLowerCase())) {
+              list.push(initBrand);
+            }
+          }
+
           // If any real UUID brand exists, deduplicate mock dummy brand (br-*) with the same name
           const uuidBrandNames = new Set(
             list.filter(b => this.isUuid(b.id)).map(b => b.name.trim().toLowerCase())
