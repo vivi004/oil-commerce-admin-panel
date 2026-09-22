@@ -69,29 +69,63 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
             </div>
 
             <div>
-              <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Oil Category *</label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="font-semibold text-slate-700 dark:text-slate-300">Oil Category *</label>
+                <button
+                  type="button"
+                  (click)="toggleCustomCategory()"
+                  class="text-[11px] text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-bold transition-colors cursor-pointer"
+                >
+                  {{ showCustomCategory() ? '← Choose Existing' : '+ New Category' }}
+                </button>
+              </div>
               <select
+                *ngIf="!showCustomCategory()"
                 formControlName="category"
                 class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
               >
                 <option *ngIf="isCustomCategory(productForm.get('category')?.value)" [value]="productForm.get('category')?.value">
-                  {{ productForm.get('category')?.value }}
+                  {{ productForm.get('category')?.value }} (Custom)
                 </option>
                 <option *ngFor="let cat of productService.categories()" [value]="cat.name">{{ cat.name }}</option>
               </select>
+              <input
+                *ngIf="showCustomCategory()"
+                type="text"
+                formControlName="category"
+                placeholder="e.g. Edible Oil, Sunflower Oil..."
+                class="w-full px-3 py-2 rounded-xl border border-amber-400 dark:border-amber-600 bg-amber-50/40 dark:bg-amber-950/20 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-amber-500"
+              />
             </div>
 
             <div>
-              <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Brand *</label>
+              <div class="flex items-center justify-between mb-1">
+                <label class="font-semibold text-slate-700 dark:text-slate-300">Brand *</label>
+                <button
+                  type="button"
+                  (click)="toggleCustomBrand()"
+                  class="text-[11px] text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 font-bold transition-colors cursor-pointer"
+                >
+                  {{ showCustomBrand() ? '← Choose Existing' : '+ New Brand' }}
+                </button>
+              </div>
               <select
+                *ngIf="!showCustomBrand()"
                 formControlName="brand"
                 class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
               >
                 <option *ngIf="isCustomBrand(productForm.get('brand')?.value)" [value]="productForm.get('brand')?.value">
-                  {{ productForm.get('brand')?.value }}
+                  {{ productForm.get('brand')?.value }} (Custom)
                 </option>
                 <option *ngFor="let brand of productService.brands()" [value]="brand.name">{{ brand.name }}</option>
               </select>
+              <input
+                *ngIf="showCustomBrand()"
+                type="text"
+                formControlName="brand"
+                placeholder="e.g. Rosi Gold, Roshini Gold..."
+                class="w-full px-3 py-2 rounded-xl border border-amber-400 dark:border-amber-600 bg-amber-50/40 dark:bg-amber-950/20 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-amber-500"
+              />
             </div>
 
             <div>
@@ -297,17 +331,42 @@ export class ProductFormComponent implements OnInit {
   productForm: FormGroup = this.fb.group({
     name: ['', Validators.required],
     brand: ['Nisha Pure Oils', Validators.required],
-    category: ['Groundnut Oil', Validators.required],
-    sku: ['NPO-GNO', Validators.required],
+    category: ['', Validators.required],
+    sku: ['', Validators.required],
     status: [ProductStatus.ACTIVE, Validators.required],
-    description: ['Wood pressed cold extraction from selected Saurashtra groundnuts.'],
+    description: ['100% traditional wood-pressed cold extraction preserving natural aroma, taste, and vital nutrients.'],
     benefits: ['Cholesterol-free, 100% natural, Mara Chekku traditional cold-press method'],
-    storageInstructions: ['Store in cool, dry place. Best within 9 months of extraction.'],
+    storageInstructions: ['Store in cool, dry place away from direct sunlight.'],
     variants: this.fb.array([])
   });
 
   get variantsArray(): FormArray {
     return this.productForm.get('variants') as FormArray;
+  }
+
+  showCustomCategory = signal<boolean>(false);
+  showCustomBrand = signal<boolean>(false);
+
+  toggleCustomCategory(): void {
+    const next = !this.showCustomCategory();
+    this.showCustomCategory.set(next);
+    if (next) {
+      this.productForm.patchValue({ category: '' });
+    } else {
+      const firstCat = this.productService.categories()[0]?.name || 'Groundnut Oil';
+      this.productForm.patchValue({ category: firstCat });
+    }
+  }
+
+  toggleCustomBrand(): void {
+    const next = !this.showCustomBrand();
+    this.showCustomBrand.set(next);
+    if (next) {
+      this.productForm.patchValue({ brand: '' });
+    } else {
+      const firstBrand = this.productService.brands()[0]?.name || 'Nisha Pure Oils';
+      this.productForm.patchValue({ brand: firstBrand });
+    }
   }
 
   isCustomCategory(name?: string | null): boolean {
@@ -378,6 +437,13 @@ export class ProductFormComponent implements OnInit {
       benefits: prod.benefits,
       storageInstructions: prod.storageInstructions
     });
+
+    if (this.isCustomCategory(prod.category)) {
+      this.showCustomCategory.set(true);
+    }
+    if (this.isCustomBrand(prod.brand)) {
+      this.showCustomBrand.set(true);
+    }
 
     const imgs = prod.images && prod.images.length > 0 
       ? prod.images.map(img => this.productService.resolveImageUrl(img))
