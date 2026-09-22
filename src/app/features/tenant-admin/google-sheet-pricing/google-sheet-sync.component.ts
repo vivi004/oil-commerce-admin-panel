@@ -272,6 +272,8 @@ export class GoogleSheetSyncComponent {
 
   async syncLive(): Promise<void> {
     await this.liveSyncService.syncCatalog();
+    // After catalog sync, also refresh sheet diffs so the table stays current
+    await this.sheetService.fetchFromSheet();
   }
 
   constructor() {
@@ -297,12 +299,20 @@ export class GoogleSheetSyncComponent {
 
   refreshFromSheet(): void {
     this.sheetService.fetchFromSheet().then(() => {
-      alert('Fetched latest daily seed pricing differences from Google Sheets.');
+      const count = this.sheetService.totalDiffCount();
+      const msg = count > 0
+        ? `Fetched ${count} price diff(s) from the Master Price Sheet.`
+        : 'All prices are in sync with the Google Sheet — no diffs found.';
+      this.liveSyncService.showFeedback(msg, 'success');
     });
   }
 
   applyChanges(): void {
     const { appliedCount } = this.sheetService.applyApprovedChanges();
-    alert(`Successfully synced ${appliedCount} oil variant price & inventory updates to the live store catalog!`);
+    this.liveSyncService.showFeedback(
+      `✓ Applied ${appliedCount} variant price update(s) to the live catalog. Backend DB is being updated.`,
+      'success',
+      7000
+    );
   }
 }
