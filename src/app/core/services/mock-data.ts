@@ -11,12 +11,14 @@ export const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-neem', name: 'Neem Oil', slug: 'neem-oil', description: 'Organic botanical cold-pressed neem seed oil', isActive: true, productCount: 1 },
   { id: 'cat-mahua', name: 'Mahua Oil', slug: 'mahua-oil', description: 'Heritage Iluppai Ennai for temple lamps & massage', isActive: true, productCount: 1 },
   { id: 'cat-palm', name: 'Palm Oil', slug: 'palm-oil', description: 'Refined palm oil for high-heat culinary uses', isActive: true, productCount: 1 },
+  { id: 'cat-sunflower', name: 'Sunflower Oil', slug: 'sunflower-oil', description: 'Pure cold-pressed organic sunflower seed oil rich in Vitamin E', isActive: true, productCount: 1 },
   { id: 'cat-burfi', name: 'Burfi', slug: 'burfi', description: 'Pure jaggery peanut chikki & traditional burfi', isActive: true, productCount: 2 },
   { id: 'cat-oil-cake', name: 'Oil Cake', slug: 'oil-cake', description: 'High-protein livestock cattle feed cake', isActive: true, productCount: 2 }
 ];
 
 export const INITIAL_BRANDS: Brand[] = [
   { id: 'br-nisha', name: 'Nisha Pure Oils', description: '100% Traditional Vaagai Wood Churned Cold-Pressed Oils', isActive: true, productCount: 12 },
+  { id: 'br-roshini', name: 'Roshini Gold', description: 'Premium wood-churned pure traditional cooking oils', isActive: true, productCount: 2 },
   { id: 'br-varshini', name: 'Varshini Gold', description: 'Premium Filtered & Puja Oil Speciality Line', isActive: true, productCount: 6 },
   { id: 'br-other', name: 'Other Brands', description: 'Third-party agro partner commodities', isActive: true, productCount: 2 }
 ];

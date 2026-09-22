@@ -531,6 +531,191 @@ export class ProductService {
     return this.saveProduct(updates, true, id);
   }
 
+  async ensureCategoryUuid(categoryNameOrId?: string, existingCategoryId?: string): Promise<string | null> {
+    if (existingCategoryId && this.isUuid(existingCategoryId)) {
+      return existingCategoryId;
+    }
+    const name = (categoryNameOrId || '').trim();
+    if (!name) {
+      return this.categoriesSignal().find(c => this.isUuid(c.id))?.id || null;
+    }
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+    // 1. Check if category with valid UUID already exists in local signal
+    const existingCat = this.categoriesSignal().find(c =>
+      (existingCategoryId && c.id === existingCategoryId) ||
+      c.id === name ||
+      c.name?.trim().toLowerCase() === name.toLowerCase() ||
+      c.slug?.trim().toLowerCase() === slug
+    );
+
+    if (existingCat && this.isUuid(existingCat.id)) {
+      return existingCat.id;
+    }
+
+    // 2. Query backend to check if category already exists by slug or name
+    try {
+      const getRes = await this.authenticatedFetch(`/categories/${slug}`);
+      if (getRes.ok) {
+        const getData = await getRes.json();
+        const liveCat = getData.data;
+        if (liveCat && this.isUuid(liveCat.id)) {
+          const liveId = liveCat.id;
+          if (existingCat) {
+            this.categoriesSignal.update(list => list.map(c => c.id === existingCat.id ? { ...c, id: liveId, name: liveCat.name || c.name, slug: liveCat.slug || c.slug } : c));
+          } else {
+            this.categoriesSignal.update(list => [{
+              id: liveId,
+              name: liveCat.name || name,
+              slug: liveCat.slug || slug,
+              description: liveCat.description || `Pure cold-pressed ${name}`,
+              image: liveCat.image || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80',
+              isActive: true,
+              productCount: 0
+            }, ...list]);
+          }
+          this.persistCategories(this.categoriesSignal());
+          return liveId;
+        }
+      }
+    } catch (e) {
+      // Proceed to create
+    }
+
+    // 3. Category does not have a backend UUID -> auto-create on backend
+    try {
+      const postRes = await this.authenticatedFetch('/categories', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: existingCat?.name || name,
+          slug: existingCat?.slug || slug,
+          description: existingCat?.description || `Pure traditional cold-pressed ${name}`,
+          icon: '🛢️',
+          sortOrder: 1,
+          active: true
+        })
+      });
+
+      if (postRes.ok) {
+        const postData = await postRes.json();
+        const liveId = postData.data?.id;
+        if (liveId && this.isUuid(liveId)) {
+          if (existingCat) {
+            this.categoriesSignal.update(list => list.map(c => c.id === existingCat.id ? { ...c, id: liveId } : c));
+          } else {
+            this.categoriesSignal.update(list => [{
+              id: liveId,
+              name: name,
+              slug: slug,
+              description: `Pure traditional cold-pressed ${name}`,
+              image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&auto=format&fit=crop&q=80',
+              isActive: true,
+              productCount: 0
+            }, ...list]);
+          }
+          this.persistCategories(this.categoriesSignal());
+          return liveId;
+        }
+      }
+    } catch (err) {
+      console.warn('Could not auto-create category on backend:', err);
+    }
+
+    // 4. Fallback to existing UUID category if backend fails
+    const anyUuidCat = this.categoriesSignal().find(c => this.isUuid(c.id));
+    return anyUuidCat ? anyUuidCat.id : (existingCat?.id || null);
+  }
+
+  async ensureBrandUuid(brandNameOrId?: string, existingBrandId?: string): Promise<string | null> {
+    if (existingBrandId && this.isUuid(existingBrandId)) {
+      return existingBrandId;
+    }
+    const name = (brandNameOrId || '').trim();
+    if (!name) {
+      return this.brandsSignal().find(b => this.isUuid(b.id))?.id || null;
+    }
+
+    // 1. Check if brand already has a valid UUID in local signal
+    const existingBrand = this.brandsSignal().find(b =>
+      (existingBrandId && b.id === existingBrandId) ||
+      b.id === name ||
+      b.name?.trim().toLowerCase() === name.toLowerCase()
+    );
+
+    if (existingBrand && this.isUuid(existingBrand.id)) {
+      return existingBrand.id;
+    }
+
+    // 2. Query backend to find if brand exists
+    try {
+      const getRes = await this.authenticatedFetch('/brands');
+      if (getRes.ok) {
+        const getData = await getRes.json();
+        const list = getData.data || [];
+        const match = list.find((b: any) => b.name?.trim().toLowerCase() === name.toLowerCase());
+        if (match && this.isUuid(match.id)) {
+          const liveId = match.id;
+          if (existingBrand) {
+            this.brandsSignal.update(l => l.map(b => b.id === existingBrand.id ? { ...b, id: liveId } : b));
+          } else {
+            this.brandsSignal.update(l => [{
+              id: liveId,
+              name: match.name || name,
+              logo: match.logo || '',
+              description: match.description || '',
+              isActive: true,
+              productCount: 0
+            }, ...l]);
+          }
+          this.persistBrands(this.brandsSignal());
+          return liveId;
+        }
+      }
+    } catch (e) {}
+
+    // 3. Auto-create brand on backend
+    try {
+      const postRes = await this.authenticatedFetch('/brands', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: existingBrand?.name || name,
+          description: existingBrand?.description || `${name} Cold Pressed Traditional Oils`,
+          logo: existingBrand?.logo || '',
+          tagline: 'Purity in Every Drop',
+          origin: 'Tamil Nadu',
+          active: true
+        })
+      });
+
+      if (postRes.ok) {
+        const postData = await postRes.json();
+        const liveId = postData.data?.id;
+        if (liveId && this.isUuid(liveId)) {
+          if (existingBrand) {
+            this.brandsSignal.update(l => l.map(b => b.id === existingBrand.id ? { ...b, id: liveId } : b));
+          } else {
+            this.brandsSignal.update(l => [{
+              id: liveId,
+              name: name,
+              logo: '',
+              description: `${name} Cold Pressed Traditional Oils`,
+              isActive: true,
+              productCount: 0
+            }, ...l]);
+          }
+          this.persistBrands(this.brandsSignal());
+          return liveId;
+        }
+      }
+    } catch (err) {
+      console.warn('Could not auto-create brand on backend:', err);
+    }
+
+    const anyUuidBrand = this.brandsSignal().find(b => this.isUuid(b.id));
+    return anyUuidBrand ? anyUuidBrand.id : (existingBrand?.id || null);
+  }
+
   async saveProduct(productData: Partial<Product>, isEdit: boolean, id?: string): Promise<Product> {
     const variants = productData.variants ?? [];
     const enabledVariants = variants.filter(v => v.isEnabled);
@@ -541,32 +726,11 @@ export class ProductService {
     const compareAtPrice = mrps.length > 0 ? Math.max(...mrps) : (Number(productData.maxPrice) || Math.round(basePrice * 1.15));
     const totalStock = variants.reduce((sum, v) => sum + (v.isEnabled ? Number(v.stockQuantity || 0) : 0), 0);
 
-    // Resolve categoryId to a valid backend UUID
-    let categoryId: string | null = null;
-    const cat = this.categoriesSignal().find(c => 
-      c.id === productData.categoryId || 
-      c.name?.toLowerCase() === productData.category?.toLowerCase() ||
-      c.slug?.toLowerCase() === (productData.category || '').toLowerCase().replace(/\s+/g, '-')
-    );
-    if (cat && this.isUuid(cat.id)) {
-      categoryId = cat.id;
-    } else {
-      const anyUuidCat = this.categoriesSignal().find(c => this.isUuid(c.id));
-      if (anyUuidCat) categoryId = anyUuidCat.id;
-    }
+    // Auto-resolve or auto-create categoryId with live backend UUID
+    const categoryId = await this.ensureCategoryUuid(productData.category, productData.categoryId);
 
-    // Resolve brandId to a valid backend UUID
-    let brandId: string | null = null;
-    const br = this.brandsSignal().find(b => 
-      b.id === (productData as any).brandId || 
-      b.name?.toLowerCase() === productData.brand?.toLowerCase()
-    );
-    if (br && this.isUuid(br.id)) {
-      brandId = br.id;
-    } else {
-      const anyUuidBrand = this.brandsSignal().find(b => this.isUuid(b.id));
-      if (anyUuidBrand) brandId = anyUuidBrand.id;
-    }
+    // Auto-resolve or auto-create brandId with live backend UUID
+    const brandId = await this.ensureBrandUuid(productData.brand, (productData as any).brandId);
 
     const primaryImage = this.resolveImageUrl(productData.primaryImage || productData.images?.[0]);
     const images = (productData.images && productData.images.length > 0)

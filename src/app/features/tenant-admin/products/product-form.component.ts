@@ -74,6 +74,9 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
                 formControlName="category"
                 class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
               >
+                <option *ngIf="isCustomCategory(productForm.get('category')?.value)" [value]="productForm.get('category')?.value">
+                  {{ productForm.get('category')?.value }}
+                </option>
                 <option *ngFor="let cat of productService.categories()" [value]="cat.name">{{ cat.name }}</option>
               </select>
             </div>
@@ -84,6 +87,9 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
                 formControlName="brand"
                 class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
               >
+                <option *ngIf="isCustomBrand(productForm.get('brand')?.value)" [value]="productForm.get('brand')?.value">
+                  {{ productForm.get('brand')?.value }}
+                </option>
                 <option *ngFor="let brand of productService.brands()" [value]="brand.name">{{ brand.name }}</option>
               </select>
             </div>
@@ -302,6 +308,16 @@ export class ProductFormComponent implements OnInit {
 
   get variantsArray(): FormArray {
     return this.productForm.get('variants') as FormArray;
+  }
+
+  isCustomCategory(name?: string | null): boolean {
+    if (!name) return false;
+    return !this.productService.categories().some(c => c.name.toLowerCase() === name.toLowerCase());
+  }
+
+  isCustomBrand(name?: string | null): boolean {
+    if (!name) return false;
+    return !this.productService.brands().some(b => b.name.toLowerCase() === name.toLowerCase());
   }
 
   ngOnInit(): void {
