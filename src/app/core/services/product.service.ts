@@ -200,6 +200,12 @@ export class ProductService {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const filtered = parsed.filter(p => !deleted.has(p.id) && !p.id.startsWith('prod-') && !demoSkus.has(p.sku));
+          filtered.forEach(p => {
+            if ((p.name?.trim().toLowerCase() === 'edible oil' || p.sku?.trim().toUpperCase() === 'VG-EO') && p.category !== 'Edible Oil') {
+              p.category = 'Edible Oil';
+              p.categoryId = 'b56c1d04-c1b5-48f8-a026-54aea8cfefcc';
+            }
+          });
           return filtered;
         }
       }
@@ -605,8 +611,23 @@ export class ProductService {
         }
       }
     } catch (e) {
-      // Proceed to create
+      // Proceed to check all categories
     }
+
+    try {
+      const allRes = await this.authenticatedFetch('/categories');
+      if (allRes.ok) {
+        const allData = await allRes.json();
+        const list = allData.data || [];
+        const match = list.find((c: any) =>
+          c.name?.trim().toLowerCase() === name.toLowerCase() ||
+          c.slug?.trim().toLowerCase() === slug
+        );
+        if (match && this.isUuid(match.id)) {
+          return match.id;
+        }
+      }
+    } catch (e) {}
 
     // 3. Category does not have a backend UUID -> auto-create on backend
     try {
@@ -648,6 +669,8 @@ export class ProductService {
     }
 
     if (existingCat && this.isUuid(existingCat.id)) return existingCat.id;
+    const nameMatchCat = this.categoriesSignal().find(c => this.isUuid(c.id) && c.name?.trim().toLowerCase() === name.toLowerCase());
+    if (nameMatchCat) return nameMatchCat.id;
     const anyUuidCat = this.categoriesSignal().find(c => this.isUuid(c.id));
     return anyUuidCat ? anyUuidCat.id : (existingCat?.id || null);
   }

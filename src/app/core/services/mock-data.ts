@@ -11,16 +11,16 @@ export const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-neem', name: 'Neem Oil', slug: 'neem-oil', description: 'Organic botanical cold-pressed neem seed oil', isActive: true, productCount: 1 },
   { id: 'cat-mahua', name: 'Mahua Oil', slug: 'mahua-oil', description: 'Heritage Iluppai Ennai for temple lamps & massage', isActive: true, productCount: 1 },
   { id: 'cat-palm', name: 'Palm Oil', slug: 'palm-oil', description: 'Refined palm oil for high-heat culinary uses', isActive: true, productCount: 1 },
-  { id: 'cat-sunflower', name: 'Sunflower Oil', slug: 'sunflower-oil', description: 'Pure cold-pressed organic sunflower seed oil rich in Vitamin E', isActive: true, productCount: 1 },
-  { id: 'cat-edible', name: 'Edible Oil', slug: 'edible-oil', description: 'Premium multi-seed traditional cold-pressed edible cooking oils', isActive: true, productCount: 1 },
+  { id: '2697bded-5084-429d-a6ac-f49116d4c80f', name: 'Sunflower Oil', slug: 'sunflower-oil', description: 'Pure cold-pressed organic sunflower seed oil rich in Vitamin E', isActive: true, productCount: 1 },
+  { id: 'b56c1d04-c1b5-48f8-a026-54aea8cfefcc', name: 'Edible Oil', slug: 'edible-oil', description: 'Premium multi-seed traditional cold-pressed edible cooking oils', isActive: true, productCount: 1 },
   { id: 'cat-burfi', name: 'Burfi', slug: 'burfi', description: 'Pure jaggery peanut chikki & traditional burfi', isActive: true, productCount: 2 },
   { id: 'cat-oil-cake', name: 'Oil Cake', slug: 'oil-cake', description: 'High-protein livestock cattle feed cake', isActive: true, productCount: 2 }
 ];
 
 export const INITIAL_BRANDS: Brand[] = [
-  { id: 'br-nisha', name: 'Nisha Pure Oils', description: '100% Traditional Vaagai Wood Churned Cold-Pressed Oils', isActive: true, productCount: 12 },
-  { id: 'br-roshini', name: 'Roshini Gold', description: 'Premium wood-churned pure traditional cooking oils', isActive: true, productCount: 2 },
-  { id: 'br-rosi', name: 'Rosi Gold', description: 'Pure wood-pressed cooking oils and healthy kitchen commodities', isActive: true, productCount: 1 },
+  { id: 'be77a6d8-3045-476c-ab40-51d1d8fdd0f0', name: 'Nisha Pure Oils', description: '100% Traditional Vaagai Wood Churned Cold-Pressed Oils', isActive: true, productCount: 12 },
+  { id: '6bd89be4-a7c9-4093-8991-3149f7e31886', name: 'Roshini Gold', description: 'Premium wood-churned pure traditional cooking oils', isActive: true, productCount: 2 },
+  { id: '71a030aa-b37f-4a69-80a9-f88c2670cc3d', name: 'Rosi Gold', description: 'Pure wood-pressed cooking oils and healthy kitchen commodities', isActive: true, productCount: 1 },
   { id: 'br-varshini', name: 'Varshini Gold', description: 'Premium Filtered & Puja Oil Speciality Line', isActive: true, productCount: 6 },
   { id: 'br-other', name: 'Other Brands', description: 'Third-party agro partner commodities', isActive: true, productCount: 2 }
 ];
