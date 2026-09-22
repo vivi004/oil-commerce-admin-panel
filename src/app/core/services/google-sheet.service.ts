@@ -29,16 +29,16 @@ interface ColProduct {
 }
 
 const SHEET_COLUMNS: ColProduct[] = [
-  { colIndex: 1,  productName: 'Groundnut Oil',  skuPrefix: 'NPO-GNO' },
-  { colIndex: 2,  productName: 'Coconut Oil',    skuPrefix: 'NPO-COC' },
-  { colIndex: 3,  productName: 'Sesame Oil',     skuPrefix: 'NPO-SES' },
-  { colIndex: 4,  productName: 'Castor Oil',     skuPrefix: 'NPO-CAS' },
-  { colIndex: 5,  productName: 'Lamp Oil',       skuPrefix: 'NPO-LMP' },
-  { colIndex: 6,  productName: 'Neem Oil',       skuPrefix: 'NPO-NEM' },
-  { colIndex: 7,  productName: 'Mahua Oil',      skuPrefix: 'NPO-MAH' },
-  { colIndex: 8,  productName: 'Edible Oil',     skuPrefix: 'VG-EO'   },
-  { colIndex: 9,  productName: 'Sunflower Oil',  skuPrefix: 'RG-SFO'  },
-  { colIndex: 10, productName: 'Palm Oil',       skuPrefix: 'RSG-PO'  },
+  { colIndex: 1, productName: 'Groundnut Oil', skuPrefix: 'NPO-GNO' },
+  { colIndex: 2, productName: 'Coconut Oil', skuPrefix: 'NPO-CCO' },
+  { colIndex: 3, productName: 'Sesame Oil', skuPrefix: 'NPO-SSO' },
+  { colIndex: 4, productName: 'Castor Oil', skuPrefix: 'NPO-CO' },
+  { colIndex: 5, productName: 'Lamp Oil', skuPrefix: 'NPO-LO' },
+  { colIndex: 6, productName: 'Neem Oil', skuPrefix: 'NPO-NO' },
+  { colIndex: 7, productName: 'Mahua Oil', skuPrefix: 'NPO-MO' },
+  { colIndex: 8, productName: 'Edible Oil', skuPrefix: 'VG-EO' },
+  { colIndex: 9, productName: 'Sunflower Oil', skuPrefix: 'RO-SO' },
+  { colIndex: 10, productName: 'Palm Oil', skuPrefix: 'RG-PO' },
 ];
 
 // Size label (lower-case) → variant SKU suffix & VariantSize display value
@@ -46,12 +46,12 @@ const SIZE_MAP: Record<string, { code: string; size: VariantSize }> = {
   '100ml': { code: '100ML', size: '100ml' },
   '200ml': { code: '200ML', size: '200ml' },
   '500ml': { code: '500ML', size: '500ml' },
-  '1ltr':  { code: '1L',    size: '1L'    },
-  '2ltr':  { code: '2L',    size: '2L'    },
-  '5ltr':  { code: '5L',    size: '5L'    },
-  '5kg':   { code: '5KG',   size: '5Kg'  },
-  '15ltr': { code: '15L',   size: '15L'  },
-  '15kg':  { code: '15KG',  size: '15Kg' },
+  '1ltr': { code: '1L', size: '1L' },
+  '2ltr': { code: '2L', size: '2L' },
+  '5ltr': { code: '5L', size: '5L' },
+  '5kg': { code: '5KG', size: '5Kg' },
+  '15ltr': { code: '15L', size: '15L' },
+  '15kg': { code: '15KG', size: '15Kg' },
 };
 
 @Injectable({ providedIn: 'root' })
@@ -61,14 +61,14 @@ export class GoogleSheetService {
       ? localStorage.getItem(STORAGE_KEY)!
       : DEFAULT_SHEET_URL;
 
-  private diffItemsSignal   = signal<SheetDiffItem[]>(INITIAL_SHEET_DIFFS);
-  private isSyncingSignal   = signal<boolean>(false);
-  private lastSyncedSignal  = signal<string>(new Date().toISOString());
+  private diffItemsSignal = signal<SheetDiffItem[]>(INITIAL_SHEET_DIFFS);
+  private isSyncingSignal = signal<boolean>(false);
+  private lastSyncedSignal = signal<string>(new Date().toISOString());
   private connectedSheetUrlSignal = signal<string>(this.initialUrl);
 
-  readonly diffItems         = this.diffItemsSignal.asReadonly();
-  readonly isSyncing         = this.isSyncingSignal.asReadonly();
-  readonly lastSynced        = this.lastSyncedSignal.asReadonly();
+  readonly diffItems = this.diffItemsSignal.asReadonly();
+  readonly isSyncing = this.isSyncingSignal.asReadonly();
+  readonly lastSynced = this.lastSyncedSignal.asReadonly();
   readonly connectedSheetUrl = this.connectedSheetUrlSignal.asReadonly();
 
   readonly approvedCount = computed(() =>
@@ -76,7 +76,7 @@ export class GoogleSheetService {
   );
   readonly totalDiffCount = computed(() => this.diffItemsSignal().length);
 
-  constructor(private productService: ProductService) {}
+  constructor(private productService: ProductService) { }
 
   // ---------------------------------------------------------------------------
   // Approval toggles
@@ -104,13 +104,13 @@ export class GoogleSheetService {
       const sheetIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
       if (!sheetIdMatch?.[1]) throw new Error('Could not extract spreadsheet ID from URL');
 
-      const sheetId   = sheetIdMatch[1];
+      const sheetId = sheetIdMatch[1];
       const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
 
       const response = await fetch(exportUrl);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const csvText    = await response.text();
+      const csvText = await response.text();
       const parsedDiffs = this.parseCsvDiffs(csvText);
       if (parsedDiffs.length > 0) {
         this.diffItemsSignal.set(parsedDiffs);
@@ -145,7 +145,7 @@ export class GoogleSheetService {
       if (cols.length < 2) continue;
 
       const sizeLabel = cols[0].trim().toLowerCase();
-      const sizeInfo  = SIZE_MAP[sizeLabel];
+      const sizeInfo = SIZE_MAP[sizeLabel];
       if (!sizeInfo) continue;   // unrecognised size row, skip
 
       for (const colProduct of SHEET_COLUMNS) {
@@ -181,24 +181,24 @@ export class GoogleSheetService {
         }
 
         const currentSellingPrice = matchedVariant.sellingPrice ?? 0;
-        const currentMrp          = matchedVariant.mrp ?? 0;
-        const priceDelta          = sheetPrice - currentSellingPrice;
+        const currentMrp = matchedVariant.mrp ?? 0;
+        const priceDelta = sheetPrice - currentSellingPrice;
 
         if (priceDelta === 0) continue;  // no change, skip
 
         diffs.push({
-          sku:                 expectedSku,
-          productName:         productName,
-          variantSize:         sizeInfo.size,
-          currentMrp:          currentMrp,
-          newMrp:              currentMrp,   // sheet has no MRP column — keep existing
+          sku: expectedSku,
+          productName: productName,
+          variantSize: sizeInfo.size,
+          currentMrp: currentMrp,
+          newMrp: currentMrp,   // sheet has no MRP column — keep existing
           currentSellingPrice: currentSellingPrice,
-          newSellingPrice:     sheetPrice,
-          currentStock:        matchedVariant.stockQuantity ?? 0,
-          newStock:            matchedVariant.stockQuantity ?? 0,  // sheet has no stock col
-          priceDelta:          priceDelta,
-          stockDelta:          0,
-          isApproved:          true
+          newSellingPrice: sheetPrice,
+          currentStock: matchedVariant.stockQuantity ?? 0,
+          newStock: matchedVariant.stockQuantity ?? 0,  // sheet has no stock col
+          priceDelta: priceDelta,
+          stockDelta: 0,
+          isApproved: true
         });
       }
     }
