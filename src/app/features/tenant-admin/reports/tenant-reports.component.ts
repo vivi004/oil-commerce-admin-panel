@@ -40,21 +40,27 @@ import { DataTableComponent, ColumnDef } from '../../../shared/components/data-t
         </div>
       </div>
 
-      <!-- Volume Breakdown Cards -->
+      <!-- KPI Summary Cards (live from services) -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-xs">
-          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Volume Sold (Liquid Liters)</div>
-          <div class="text-2xl font-black text-slate-900 dark:text-white mt-1">4,280 L</div>
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Orders Revenue</div>
+          <div class="text-2xl font-black text-slate-900 dark:text-white mt-1">
+            ₹{{ orderService.totalRevenue().toLocaleString() }}
+          </div>
           <div class="text-[11px] text-emerald-600 mt-2 flex items-center gap-1 font-medium">
-            <span class="material-symbols-outlined text-[14px]">trending_up</span> Top: Groundnut (1,850L), Sesame (1,240L)
+            <span class="material-symbols-outlined text-[14px]">trending_up</span>
+            {{ orderService.totalOrdersCount() }} paid order(s) total
           </div>
         </div>
 
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs">
-          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Agro Solid By-Products (Kg)</div>
-          <div class="text-2xl font-black text-slate-900 dark:text-white mt-1">8,400 Kg</div>
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Products in Catalog</div>
+          <div class="text-2xl font-black text-slate-900 dark:text-white mt-1">
+            {{ productService.totalProductsCount() }} SKUs
+          </div>
           <div class="text-[11px] text-amber-600 mt-2 flex items-center gap-1 font-medium">
-            <span class="material-symbols-outlined text-[14px]">eco</span> Groundnut Oil Cake & Sesame Burfi
+            <span class="material-symbols-outlined text-[14px]">eco</span>
+            {{ productService.categories().length }} active oil categories
           </div>
         </div>
 
@@ -63,7 +69,7 @@ import { DataTableComponent, ColumnDef } from '../../../shared/components/data-t
           <div class="text-2xl font-black text-slate-900 dark:text-white mt-1">
             ₹{{ Math.round(orderService.totalRevenue() / Math.max(1, orderService.totalOrdersCount())).toLocaleString() }}
           </div>
-          <div class="text-[11px] text-slate-500 mt-2">Driven by 5L & 15L family tin combo packs</div>
+          <div class="text-[11px] text-slate-500 mt-2">Avg. revenue per paid order</div>
         </div>
       </div>
 
@@ -91,7 +97,13 @@ import { DataTableComponent, ColumnDef } from '../../../shared/components/data-t
 
       <!-- TAB 1: TOP SELLING SKUS TABLE -->
       <div *ngIf="activeTab() === 'skus'" class="space-y-4">
+        <div *ngIf="topSkus().length === 0" class="text-center py-16 text-slate-400 dark:text-slate-500">
+          <span class="material-symbols-outlined text-[48px] block mb-2 opacity-40">leaderboard</span>
+          <div class="text-sm font-semibold">No SKU sales data yet</div>
+          <div class="text-xs mt-1">All catalog SKUs will appear here sorted by revenue. Orders from the storefront contribute unit counts automatically.</div>
+        </div>
         <app-data-table
+          *ngIf="topSkus().length > 0"
           [columns]="skuColumns"
           [totalCount]="filteredSkus().length"
           [pageSize]="10"
@@ -128,7 +140,13 @@ import { DataTableComponent, ColumnDef } from '../../../shared/components/data-t
 
       <!-- TAB 2: CATEGORY SALES TABLE -->
       <div *ngIf="activeTab() === 'categories'" class="space-y-4">
+        <div *ngIf="reportCategories().length === 0" class="text-center py-16 text-slate-400 dark:text-slate-500">
+          <span class="material-symbols-outlined text-[48px] block mb-2 opacity-40">pie_chart</span>
+          <div class="text-sm font-semibold">No category data yet</div>
+          <div class="text-xs mt-1">Add products under categories to see revenue contribution per oil type.</div>
+        </div>
         <app-data-table
+          *ngIf="reportCategories().length > 0"
           [columns]="categoryColumns"
           [totalCount]="filteredCategories().length"
           [pageSize]="10"
@@ -147,14 +165,14 @@ import { DataTableComponent, ColumnDef } from '../../../shared/components/data-t
                 {{ cat.sizes }}
               </td>
               <td class="px-4 py-3 text-right font-semibold text-slate-800 dark:text-slate-200 text-xs">
-                {{ cat.liters }}
+                {{ cat.productCount }} SKU(s)
               </td>
               <td class="px-4 py-3 text-right font-black text-slate-900 dark:text-white text-xs">
-                {{ cat.revenue }}
+                ₹{{ cat.revenue.toLocaleString() }}
               </td>
               <td class="px-4 py-3 text-right">
                 <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                  {{ cat.share }}
+                  {{ cat.share }}%
                 </span>
               </td>
             </tr>
@@ -192,33 +210,94 @@ export class TenantReportsComponent {
     { key: 'name', label: 'Oil Category', sortable: true },
     { key: 'use', label: 'Primary Culinary / Pooja Use' },
     { key: 'sizes', label: 'Available Pack Sizes' },
-    { key: 'liters', label: 'Liters / Kg Extracted', sortable: true, align: 'right' },
+    { key: 'productCount', label: 'Products', sortable: true, align: 'right' },
     { key: 'revenue', label: 'Revenue Contribution', sortable: true, align: 'right' },
     { key: 'share', label: 'Catalog Share', align: 'right' }
   ];
 
-  topSkus = [
-    { sku: 'NPO-GND-5L', name: 'Cold Pressed Groundnut Oil (Mara Chekku)', size: '5 Litre Tin', category: 'Groundnut Oil', unitsSold: 580, unitPrice: 1250, grossRevenue: 725000, marginPercent: 28 },
-    { sku: 'NPO-SES-1L', name: 'Pure Wood-Churned Sesame Oil (Gingelly)', size: '1 Litre Bottle', category: 'Sesame Oil', unitsSold: 920, unitPrice: 420, grossRevenue: 386400, marginPercent: 32 },
-    { sku: 'NPO-COC-1L', name: 'Virgin Copra Coconut Oil', size: '1 Litre Bottle', category: 'Coconut Oil', unitsSold: 640, unitPrice: 340, grossRevenue: 217600, marginPercent: 30 },
-    { sku: 'NPO-GND-1L', name: 'Cold Pressed Groundnut Oil', size: '1 Litre Bottle', category: 'Groundnut Oil', unitsSold: 710, unitPrice: 260, grossRevenue: 184600, marginPercent: 26 },
-    { sku: 'NPO-LMP-5L', name: 'Pancha Deepa Pooja Oil Blend', size: '5 Litre Can', category: 'Lamp Oil', unitsSold: 220, unitPrice: 780, grossRevenue: 171600, marginPercent: 35 },
-    { sku: 'NPO-CAKE-15KG', name: 'Organic Mara Chekku Groundnut Oil Cake', size: '15 Kg Gunny Bag', category: 'Agro By-Products', unitsSold: 410, unitPrice: 650, grossRevenue: 266500, marginPercent: 22 }
-  ];
+  /**
+   * Derives SKU-level report rows from real product catalog + order line items.
+   * Each enabled product variant becomes one row.
+   * Units sold are aggregated from all order items matching the variant SKU.
+   * Margin % = (MRP - Selling Price) / MRP * 100.
+   * Sorted by gross revenue descending, then by units sold.
+   */
+  topSkus = computed(() => {
+    const products = this.productService.products();
+    const orders = this.orderService.orders();
 
-  reportCategories = [
-    { name: 'Groundnut Oil', use: 'Daily Cooking & Deep Frying', sizes: '500ml, 1L, 2L, 5L, 15L', liters: '1,850 L', revenue: '₹4,62,500', share: '32.5%' },
-    { name: 'Sesame Oil (Gingelly)', use: 'Traditional Chekku & Idli Podi', sizes: '200ml, 500ml, 1L, 5L', liters: '1,240 L', revenue: '₹4,46,400', share: '31.4%' },
-    { name: 'Coconut Oil', use: 'Cooking & Hair Care', sizes: '100ml, 500ml, 1L, 2L, 5L', liters: '820 L', revenue: '₹2,62,400', share: '18.5%' },
-    { name: 'Lamp Oil (Puja Oil)', use: 'Pooja Deepam blend (5 Oils)', sizes: '500ml, 1L, 5L', liters: '540 L', revenue: '₹1,02,600', share: '7.2%' },
-    { name: 'Castor Oil', use: 'Ayurvedic Cooling & Medicinal', sizes: '100ml, 200ml, 500ml', liters: '210 L', revenue: '₹75,600', share: '5.3%' },
-    { name: 'Oil Cake & Burfi', use: 'Cattle Feed & Sweets', sizes: '5Kg, 15Kg bags', liters: '8,400 Kg', revenue: '₹1,68,000', share: '5.1%' }
-  ];
+    const skuSalesMap = new Map<string, number>();
+    for (const order of orders) {
+      for (const item of order.items || []) {
+        if (!item.sku) continue;
+        skuSalesMap.set(item.sku, (skuSalesMap.get(item.sku) ?? 0) + (item.quantity || 0));
+      }
+    }
+
+    const rows: {
+      sku: string; name: string; size: string; category: string;
+      unitsSold: number; unitPrice: number; grossRevenue: number; marginPercent: number;
+    }[] = [];
+
+    for (const prod of products) {
+      for (const variant of prod.variants) {
+        if (!variant.isEnabled) continue;
+        const unitsSold = skuSalesMap.get(variant.sku) ?? 0;
+        const grossRevenue = unitsSold * (variant.sellingPrice || 0);
+        const marginPercent = variant.mrp && variant.sellingPrice && variant.mrp > 0
+          ? Math.round(((variant.mrp - variant.sellingPrice) / variant.mrp) * 100)
+          : 0;
+        rows.push({
+          sku: variant.sku, name: prod.name, size: variant.size, category: prod.category,
+          unitsSold, unitPrice: variant.sellingPrice || 0, grossRevenue, marginPercent
+        });
+      }
+    }
+
+    return rows.sort((a, b) => b.grossRevenue - a.grossRevenue || b.unitsSold - a.unitsSold);
+  });
+
+  /**
+   * Derives category-level revenue rows from real categories + products + orders.
+   * Only categories with at least one product are shown.
+   * Revenue = sum of order item revenue for products in that category.
+   * Share = category revenue / total order revenue.
+   * Sorted by revenue descending.
+   */
+  reportCategories = computed(() => {
+    const products = this.productService.products();
+    const categories = this.productService.categories();
+    const orders = this.orderService.orders();
+
+    const productRevenueMap = new Map<string, number>();
+    for (const order of orders) {
+      for (const item of order.items || []) {
+        if (!item.productId) continue;
+        productRevenueMap.set(item.productId, (productRevenueMap.get(item.productId) ?? 0) + (item.totalPrice || 0));
+      }
+    }
+
+    const totalRevenue = Array.from(productRevenueMap.values()).reduce((a, b) => a + b, 0);
+
+    return categories
+      .filter(cat => cat.isActive)
+      .map(cat => {
+        const catProducts = products.filter(p => p.category === cat.name || p.categoryId === cat.id);
+        const revenue = catProducts.reduce((sum, p) => sum + (productRevenueMap.get(p.id) ?? 0), 0);
+        const productCount = catProducts.length;
+        const enabledVariants = catProducts.flatMap(p => p.variants.filter(v => v.isEnabled));
+        const sizes = [...new Set(enabledVariants.map(v => v.size))].join(', ') || '—';
+        const share = totalRevenue > 0 ? ((revenue / totalRevenue) * 100).toFixed(1) : '0.0';
+        return { name: cat.name, use: cat.description || '—', sizes, productCount, revenue, share };
+      })
+      .filter(cat => cat.productCount > 0)
+      .sort((a, b) => b.revenue - a.revenue);
+  });
 
   filteredSkus = computed(() => {
     const q = this.skuSearch().toLowerCase().trim();
-    if (!q) return this.topSkus;
-    return this.topSkus.filter(s =>
+    if (!q) return this.topSkus();
+    return this.topSkus().filter(s =>
       s.name.toLowerCase().includes(q) ||
       s.sku.toLowerCase().includes(q) ||
       s.category.toLowerCase().includes(q)
@@ -227,8 +306,8 @@ export class TenantReportsComponent {
 
   filteredCategories = computed(() => {
     const q = this.catSearch().toLowerCase().trim();
-    if (!q) return this.reportCategories;
-    return this.reportCategories.filter(c =>
+    if (!q) return this.reportCategories();
+    return this.reportCategories().filter(c =>
       c.name.toLowerCase().includes(q) ||
       c.use.toLowerCase().includes(q)
     );
@@ -244,9 +323,9 @@ export class TenantReportsComponent {
 
   exportActiveReport(): void {
     if (this.activeTab() === 'skus') {
-      this.exportService.exportToCsv('NishaPureOils-TopSKUs', this.topSkus);
+      this.exportService.exportToCsv('NishaPureOils-TopSKUs', this.topSkus());
     } else {
-      this.exportService.exportToCsv('NishaPureOils-Category-Sales', this.reportCategories);
+      this.exportService.exportToCsv('NishaPureOils-Category-Sales', this.reportCategories());
     }
   }
 }

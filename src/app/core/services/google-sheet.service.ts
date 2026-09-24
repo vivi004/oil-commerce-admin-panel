@@ -1,6 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { SheetDiffItem, VariantSize } from '../models/app.models';
-import { INITIAL_SHEET_DIFFS } from './mock-data';
 import { ProductService } from './product.service';
 import { fetchWithTimeout, getApiUrl } from '../utils/api.utils';
 
@@ -61,7 +60,7 @@ export class GoogleSheetService {
       ? localStorage.getItem(STORAGE_KEY)!
       : DEFAULT_SHEET_URL;
 
-  private diffItemsSignal = signal<SheetDiffItem[]>(INITIAL_SHEET_DIFFS);
+  private diffItemsSignal = signal<SheetDiffItem[]>([]);
   private isSyncingSignal = signal<boolean>(false);
   private lastSyncedSignal = signal<string>(new Date().toISOString());
   private connectedSheetUrlSignal = signal<string>(this.initialUrl);
