@@ -179,16 +179,15 @@ export class GoogleSheetService {
   }
 
   // ---------------------------------------------------------------------------
-  // applyApprovedChanges — persist to backend FIRST, then update local catalog
+  // applyApprovedChanges — persist to backend FIRST (with prices), then update local catalog
   // ---------------------------------------------------------------------------
   async applyApprovedChanges(): Promise<{ appliedCount: number }> {
     const approved = this.diffItemsSignal().filter(i => i.isApproved);
     if (approved.length === 0) return { appliedCount: 0 };
 
-    const approvedSkus = approved.map(i => i.sku);
-
-    // 1. Persist to backend DB FIRST — await confirmation before updating UI
-    await this.persistToBackend(approvedSkus);
+    // 1. Persist to backend DB FIRST — send SKU + new price pairs so backend
+    //    does NOT need its in-memory cache (safe across server restarts on Render)
+    await this.persistToBackend(approved);
 
     // 2. Update local in-memory catalog only after backend succeeds
     const products = this.productService.products();
@@ -218,9 +217,12 @@ export class GoogleSheetService {
     return { appliedCount: approved.length };
   }
 
-  /** Calls POST /admin/sheet-sync/approve to save prices to the DB */
-  private async persistToBackend(skus: string[]): Promise<void> {
-    if (skus.length === 0) return;
+  /**
+   * Calls POST /admin/sheet-sync/approve with {skuPrices: {sku: newPrice, ...}}
+   * Sends new prices directly — backend does NOT need its in-memory cache.
+   */
+  private async persistToBackend(approved: SheetDiffItem[]): Promise<void> {
+    if (approved.length === 0) return;
     try {
       const token = typeof window !== 'undefined'
         ? localStorage.getItem('nisha_admin_token')
@@ -229,16 +231,22 @@ export class GoogleSheetService {
         ? { Authorization: `Bearer ${token}` }
         : {};
 
+      // Build sku → newSellingPrice map so backend writes correct price to DB
+      const skuPrices: Record<string, number> = {};
+      for (const item of approved) {
+        skuPrices[item.sku] = item.newSellingPrice;
+      }
+
       const res = await fetchWithTimeout(getApiUrl('/admin/sheet-sync/approve'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ skus })
+        body: JSON.stringify({ skuPrices })
       }, 15_000);
       if (!res.ok) {
         const text = await res.text();
         console.warn(`Backend approve returned ${res.status}: ${text}`);
       } else {
-        console.info(`Backend: ${skus.length} variant price(s) persisted to DB.`);
+        console.info(`Backend: ${approved.length} variant price(s) persisted to DB.`);
       }
     } catch (err) {
       console.warn('Backend approve network error:', err);
