@@ -8,18 +8,18 @@ const DEFAULT_SHEET_URL =
 const STORAGE_KEY = 'oil_commerce_sheet_url';
 
 // ---------------------------------------------------------------------------
-// Master_Price_Sheet column → product mapping
+// Master_Price_Sheet column → product mapping (aligned with DB SKU prefixes)
 //  Col 0  : Size label (row header)
 //  Col 1  : Groundnut Oil   → NPO-GNO
-//  Col 2  : Coconut Oil     → NPO-COC
-//  Col 3  : Sesame Oil      → NPO-SES
-//  Col 4  : Castor Oil      → NPO-CAS
-//  Col 5  : Lamp Oil        → NPO-LMP
-//  Col 6  : Neem Oil        → NPO-NEM
-//  Col 7  : Mahua Oil       → NPO-MAH
+//  Col 2  : Coconut Oil     → NPO-CCO  (fixed: was NPO-COC)
+//  Col 3  : Sesame Oil      → NPO-SSO
+//  Col 4  : Castor Oil      → NPO-CO
+//  Col 5  : Lamp Oil        → NPO-LO
+//  Col 6  : Neem Oil        → NPO-NO
+//  Col 7  : Mahua Oil       → NPO-MO
 //  Col 8  : Edible Oil      → VG-EO
-//  Col 9  : Sunflower Oil   → RG-SFO
-//  Col 10 : Palm Oil        → RSG-PO
+//  Col 9  : Sunflower Oil   → RO-SO
+//  Col 10 : Palm Oil        → RG-PO
 // ---------------------------------------------------------------------------
 interface ColProduct {
   colIndex: number;
@@ -93,119 +93,68 @@ export class GoogleSheetService {
   }
 
   // ---------------------------------------------------------------------------
-  // fetchFromSheet — reads CSV directly from browser, parses the real sheet layout
+  // fetchFromSheet — calls backend /admin/sheet-sync/import which fetches CSV,
+  // compares against LIVE DB prices (authoritative), returns SheetSyncPreviewDto[]
   // ---------------------------------------------------------------------------
   async fetchFromSheet(): Promise<void> {
     this.isSyncingSignal.set(true);
-    const url = this.connectedSheetUrlSignal();
+    const sheetUrl = this.connectedSheetUrlSignal();
 
     try {
-      const sheetIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (!sheetIdMatch?.[1]) throw new Error('Could not extract spreadsheet ID from URL');
+      const token = typeof window !== 'undefined'
+        ? localStorage.getItem('nisha_admin_token')
+        : null;
+      const authHeaders: Record<string, string> = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
 
-      const sheetId = sheetIdMatch[1];
-      const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+      // POST to backend with optional custom sheet URL as query param
+      const sheetIdMatch = sheetUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const queryParam   = sheetIdMatch?.[1]
+        ? `?sheetUrl=${encodeURIComponent(sheetUrl)}`
+        : '';
 
-      const response = await fetch(exportUrl);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const res = await fetchWithTimeout(
+        getApiUrl(`/admin/sheet-sync/import${queryParam}`),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders }
+        },
+        25_000
+      );
 
-      const csvText = await response.text();
-      const parsedDiffs = this.parseCsvDiffs(csvText);
-      if (parsedDiffs.length > 0) {
-        this.diffItemsSignal.set(parsedDiffs);
-      } else {
-        // All prices already in sync — show empty list (not mock)
-        this.diffItemsSignal.set([]);
-      }
+      if (!res.ok) throw new Error(`Backend import returned HTTP ${res.status}`);
+
+      const json = await res.json();
+      // Backend returns ApiResponse<List<SheetSyncPreviewDto>>
+      const diffs: SheetDiffItem[] = (json.data ?? []).map((d: any) => ({
+        sku:                 d.sku,
+        productName:         d.productName,
+        variantSize:         d.variantSize as VariantSize,
+        currentMrp:          Number(d.mrp ?? 0),
+        newMrp:              Number(d.newMrp ?? d.mrp ?? 0),
+        currentSellingPrice: Number(d.currentPrice ?? 0),
+        newSellingPrice:     Number(d.newPrice ?? 0),
+        currentStock:        Number(d.currentStock ?? 0),
+        newStock:            Number(d.currentStock ?? 0),  // sheet has no stock col
+        priceDelta:          Number(d.priceDelta ?? 0),
+        stockDelta:          0,
+        isApproved:          d.approved !== false          // default true
+      }));
+
+      this.diffItemsSignal.set(diffs);
+      console.info(`Sheet sync: ${diffs.length} price diff(s) from backend (live DB comparison).`);
     } catch (err) {
-      console.warn('Could not fetch Google Sheet — keeping current diff state:', err);
+      console.warn('Sheet import from backend failed — keeping current diff state:', err);
     } finally {
       this.isSyncingSignal.set(false);
       this.lastSyncedSignal.set(new Date().toISOString());
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // parseCsvDiffs — understands the actual Master_Price_Sheet layout:
-  //   Row 0: Brand name header  → SKIP
-  //   Row 1: Product name header → SKIP
-  //   Rows 2+: Size data rows (col 0 = size label, col 1–10 = prices)
-  // ---------------------------------------------------------------------------
-  private parseCsvDiffs(csvText: string): SheetDiffItem[] {
-    const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0);
-    if (lines.length < 3) return [];
-
-    const products = this.productService.products();
-    const diffs: SheetDiffItem[] = [];
-
-    // Start from row index 2 (skip brand-header row 0 and product-name-header row 1)
-    for (let rowIdx = 2; rowIdx < lines.length; rowIdx++) {
-      const cols = this.parseCsvLine(lines[rowIdx]);
-      if (cols.length < 2) continue;
-
-      const sizeLabel = cols[0].trim().toLowerCase();
-      const sizeInfo = SIZE_MAP[sizeLabel];
-      if (!sizeInfo) continue;   // unrecognised size row, skip
-
-      for (const colProduct of SHEET_COLUMNS) {
-        const { colIndex, productName, skuPrefix } = colProduct;
-        if (colIndex >= cols.length) continue;
-
-        const cellValue = cols[colIndex].trim();
-        if (!cellValue || cellValue === '-' || cellValue === '') continue;
-
-        const sheetPrice = parseFloat(cellValue.replace(/[^0-9.]/g, ''));
-        if (isNaN(sheetPrice) || sheetPrice <= 0) continue;
-
-        // Build expected SKU e.g. NPO-GNO-1L
-        const expectedSku = `${skuPrefix}-${sizeInfo.code}`;
-
-        // Find matching variant in admin's local product catalog
-        let matchedVariant: any = null;
-        let matchedProduct: any = null;
-        for (const prod of products) {
-          const found = prod.variants.find(v =>
-            v.sku?.toUpperCase() === expectedSku.toUpperCase()
-          );
-          if (found) {
-            matchedVariant = found;
-            matchedProduct = prod;
-            break;
-          }
-        }
-
-        if (!matchedVariant) {
-          // Variant not yet in local catalog — skip (backend sync handles DB match)
-          continue;
-        }
-
-        const currentSellingPrice = matchedVariant.sellingPrice ?? 0;
-        const currentMrp = matchedVariant.mrp ?? 0;
-        const priceDelta = sheetPrice - currentSellingPrice;
-
-        if (priceDelta === 0) continue;  // no change, skip
-
-        diffs.push({
-          sku: expectedSku,
-          productName: productName,
-          variantSize: sizeInfo.size,
-          currentMrp: currentMrp,
-          newMrp: currentMrp,   // sheet has no MRP column — keep existing
-          currentSellingPrice: currentSellingPrice,
-          newSellingPrice: sheetPrice,
-          currentStock: matchedVariant.stockQuantity ?? 0,
-          newStock: matchedVariant.stockQuantity ?? 0,  // sheet has no stock col
-          priceDelta: priceDelta,
-          stockDelta: 0,
-          isApproved: true
-        });
-      }
-    }
-
-    return diffs;
-  }
-
-  /** Parse one CSV line respecting quoted fields */
+  // parseCsvLine is no longer used for the primary sync flow (backend handles CSV parsing)
+  // Kept for potential future use or fallback scenarios.
+  /** @deprecated Use fetchFromSheet() which calls the backend importer */
   private parseCsvLine(line: string): string[] {
     const fields: string[] = [];
     let current = '';
@@ -230,13 +179,19 @@ export class GoogleSheetService {
   }
 
   // ---------------------------------------------------------------------------
-  // applyApprovedChanges — update local catalog AND call backend API
+  // applyApprovedChanges — persist to backend FIRST, then update local catalog
   // ---------------------------------------------------------------------------
-  applyApprovedChanges(): { appliedCount: number } {
+  async applyApprovedChanges(): Promise<{ appliedCount: number }> {
     const approved = this.diffItemsSignal().filter(i => i.isApproved);
-    const products = this.productService.products();
+    if (approved.length === 0) return { appliedCount: 0 };
 
-    // 1. Update local in-memory catalog
+    const approvedSkus = approved.map(i => i.sku);
+
+    // 1. Persist to backend DB FIRST — await confirmation before updating UI
+    await this.persistToBackend(approvedSkus);
+
+    // 2. Update local in-memory catalog only after backend succeeds
+    const products = this.productService.products();
     for (const item of approved) {
       for (const prod of products) {
         const variant = prod.variants.find(v => v.sku === item.sku);
@@ -250,15 +205,17 @@ export class GoogleSheetService {
       }
     }
 
-    // 2. Persist to backend DB (fire-and-forget, errors logged)
-    const approvedSkus = approved.map(i => i.sku);
-    this.persistToBackend(approvedSkus).catch(err =>
-      console.warn('Backend approve call failed (local changes still applied):', err)
-    );
-
-    const appliedCount = approved.length;
+    // 3. Remove applied items from the diff list
     this.diffItemsSignal.update(items => items.filter(i => !i.isApproved));
-    return { appliedCount };
+
+    // 4. Reload product catalog from backend so prices are fresh everywhere
+    try {
+      await this.productService.syncFromBackend();
+    } catch (err) {
+      console.warn('Post-approve catalog reload failed (prices already saved to DB):', err);
+    }
+
+    return { appliedCount: approved.length };
   }
 
   /** Calls POST /admin/sheet-sync/approve to save prices to the DB */

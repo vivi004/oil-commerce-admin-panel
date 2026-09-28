@@ -307,8 +307,8 @@ export class GoogleSheetSyncComponent {
     });
   }
 
-  applyChanges(): void {
-    const { appliedCount } = this.sheetService.applyApprovedChanges();
+  async applyChanges(): Promise<void> {
+    const { appliedCount } = await this.sheetService.applyApprovedChanges();
     this.liveSyncService.showFeedback(
       `✓ Applied ${appliedCount} variant price update(s) to the live catalog. Backend DB is being updated.`,
       'success',
