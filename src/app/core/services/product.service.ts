@@ -482,7 +482,6 @@ export class ProductService {
           barcode: v.barcode || '',
           mrp: Number(v.mrp || v.price || 0),
           sellingPrice: Number(v.sellingPrice || v.discountPrice || v.price || 0),
-          gstRate: Number(v.gstPercent || v.gstRate || 5),
           stockQuantity: Number(v.stockQuantity || v.stock || 0),
           reorderLevel: Number(v.reorderLevel || 15),
           isEnabled: v.enabled !== false && v.isEnabled !== false
@@ -799,7 +798,6 @@ export class ProductService {
       discountPercent: (v.mrp && v.sellingPrice && Number(v.mrp) > Number(v.sellingPrice)) 
         ? Math.round(((Number(v.mrp) - Number(v.sellingPrice)) / Number(v.mrp)) * 100) 
         : 0,
-      gstPercent: Number(v.gstRate ?? 5),
       sku: v.sku || `${productData.sku || 'NPO'}-${v.size}`,
       barcode: v.barcode || '',
       stockQuantity: Number(v.stockQuantity || 0),
@@ -1101,7 +1099,6 @@ export class ProductService {
       barcode: `89012345${idx + 100}`,
       mrp: (idx + 1) * 100,
       sellingPrice: (idx + 1) * 85,
-      gstRate: 5,
       stockQuantity: 50,
       reorderLevel: 15,
       isEnabled: ['200ml', '500ml', '1L', '5L'].includes(size)

@@ -227,7 +227,7 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
                 <span class="material-symbols-outlined text-[18px] text-amber-500">grid_view</span>
                 <span>Packaging Sizes & SKU Matrix (100ml to 15Kg)</span>
               </h2>
-              <p class="text-[11px] text-slate-400 mt-0.5">Enable packaging sizes, set retail pricing, GST rates, and inventory thresholds.</p>
+              <p class="text-[11px] text-slate-400 mt-0.5">Enable packaging sizes, set retail pricing, and inventory thresholds.</p>
             </div>
 
             <!-- Quick Auto Fill Helper -->
@@ -249,7 +249,6 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
                   <th class="py-2.5 px-3">SKU</th>
                   <th class="py-2.5 px-3">MRP (₹)</th>
                   <th class="py-2.5 px-3">Selling Price (₹)</th>
-                  <th class="py-2.5 px-3">GST (%)</th>
                   <th class="py-2.5 px-3">Stock Units</th>
                   <th class="py-2.5 px-3">Min Threshold</th>
                 </tr>
@@ -296,15 +295,6 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
                       type="number"
                       formControlName="sellingPrice"
                       class="w-24 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-amber-600 dark:text-amber-400"
-                    />
-                  </td>
-
-                  <!-- GST Input -->
-                  <td class="py-3 px-3">
-                    <input
-                      type="number"
-                      formControlName="gstRate"
-                      class="w-16 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                     />
                   </td>
 
@@ -433,7 +423,6 @@ export class ProductFormComponent implements OnInit {
       sku: [v.sku, Validators.required],
       mrp: [v.mrp, Validators.required],
       sellingPrice: [v.sellingPrice, Validators.required],
-      gstRate: [v.gstRate, Validators.required],
       stockQuantity: [v.stockQuantity, Validators.required],
       reorderLevel: [v.reorderLevel, Validators.required],
       isEnabled: [v.isEnabled]
@@ -486,7 +475,6 @@ export class ProductFormComponent implements OnInit {
           barcode: '',
           mrp: 400,
           sellingPrice: 350,
-          gstRate: 5,
           stockQuantity: 0,
           reorderLevel: 10,
           isEnabled: false

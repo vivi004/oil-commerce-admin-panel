@@ -263,7 +263,6 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
                 <th class="p-2.5 text-center">Pack Size</th>
                 <th class="p-2.5 text-right">Qty</th>
                 <th class="p-2.5 text-right">Rate (₹)</th>
-                <th class="p-2.5 text-right">GST (5%)</th>
                 <th class="p-2.5 text-right">Amount (₹)</th>
               </tr>
             </thead>
@@ -276,7 +275,6 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
                 <td class="p-2.5 text-center font-semibold">{{ item.variantSize }}</td>
                 <td class="p-2.5 text-right font-bold">{{ item.quantity }}</td>
                 <td class="p-2.5 text-right">₹{{ item.unitPrice }}</td>
-                <td class="p-2.5 text-right">₹{{ item.taxAmount }}</td>
                 <td class="p-2.5 text-right font-bold">₹{{ item.totalPrice }}</td>
               </tr>
             </tbody>
@@ -289,14 +287,6 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
               <div class="flex justify-between text-slate-600">
                 <span>Subtotal:</span>
                 <span>₹{{ selectedOrder()?.subtotal?.toLocaleString() }}</span>
-              </div>
-              <div class="flex justify-between text-slate-600">
-                <span>CGST (2.5%):</span>
-                <span>₹{{ ((selectedOrder()?.taxTotal || 0) / 2).toFixed(2) }}</span>
-              </div>
-              <div class="flex justify-between text-slate-600">
-                <span>SGST (2.5%):</span>
-                <span>₹{{ ((selectedOrder()?.taxTotal || 0) / 2).toFixed(2) }}</span>
               </div>
               <div class="flex justify-between text-slate-600">
                 <span>Shipping Charges:</span>

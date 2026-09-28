@@ -52,7 +52,6 @@ export interface ProductVariant {
   barcode: string;
   mrp: number;
   sellingPrice: number;
-  gstRate: number; // percentage, e.g. 5
   stockQuantity: number;
   reorderLevel: number;
   variantImage?: string;
