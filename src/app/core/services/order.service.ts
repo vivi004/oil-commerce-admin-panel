@@ -52,8 +52,8 @@ export class OrderService {
   isDemoOrder(o: any): boolean {
     if (!o) return true;
     const demoIds = new Set(['ord-8841', 'ord-8842', 'ord-8843', 'ord-9821', 'ord-8419', 'ord-7612']);
-    const demoNumbers = new Set(['NPO-2025-8841', 'NPO-2025-8842', 'NPO-2025-8843', 'NPO-8841', 'NPO-8842', 'NPO-8843']);
-    const demoNames = ['anandapadmanabhan', 'deepa meenakshi', 'karthikeyan subramanian', 'kavitha', 'suresh b'];
+    const demoNumbers = new Set(['NPO-2025-8841', 'NPO-2025-8842', 'NPO-2025-8843', 'NPO-8841', 'NPO-8842', 'NPO-8843', 'ORD-2297-2026', 'ORD-6741-2026', 'ORD-4943-2026']);
+    const demoNames = ['anandapadmanabhan', 'deepa meenakshi', 'karthikeyan subramanian', 'kavitha', 'suresh b', 'ramesh kumar'];
     const demoEmails = new Set(['anand.p@gmail.com', 'deepa.m@yahoo.com', 'karthik.sub@outlook.com', 'kavitha.s@gmail.com', 'suresh.b@gmail.com']);
 
     const id = String(o.id || '').trim();
