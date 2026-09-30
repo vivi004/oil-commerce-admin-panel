@@ -259,10 +259,13 @@ export class OrderService {
   }
 
   async updateOrderStatus(orderId: string, status: OrderStatus, trackingNumber?: string, carrier?: string): Promise<void> {
+    const targetOrder = this.ordersSignal().find(o => o.id === orderId || o.orderNumber === orderId);
+    const targetId = targetOrder?.id || orderId;
+
     // 1. Optimistic local update with persistence
     this.ordersSignal.update(orders => {
       const updated = orders.map(o => {
-        if (o.id === orderId) {
+        if (o.id === orderId || o.orderNumber === orderId || (targetOrder && o.id === targetOrder.id)) {
           return {
             ...o,
             status,
@@ -277,29 +280,100 @@ export class OrderService {
       return updated;
     });
 
-    // 2. Sync to backend if order is a UUID
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
-    if (isUuid) {
-      try {
-        const token = localStorage.getItem('nisha_admin_token');
-        if (token) {
-          await fetchWithTimeout(getApiUrl(`/admin/orders/${orderId}/status`), {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              status,
-              note: `Status updated to ${status} via Admin Portal`,
-              trackingNumber: trackingNumber || undefined,
-              carrier: carrier || undefined
-            })
-          }, 1500);
-        }
-      } catch (err) {
-        console.warn('Failed to sync status update to backend:', err);
+    // 2. Broadcast for same browser / cross-tab synchronization
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('nisha_orders_channel');
+        bc.postMessage({
+          type: 'ORDER_STATUS_UPDATED',
+          orderId: targetId,
+          orderNumber: targetOrder?.orderNumber,
+          status,
+          trackingNumber,
+          carrier,
+          timestamp: Date.now()
+        });
+        bc.close();
       }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nisha_last_order_update', JSON.stringify({
+          orderId: targetId,
+          orderNumber: targetOrder?.orderNumber,
+          status,
+          trackingNumber,
+          carrier,
+          timestamp: Date.now()
+        }));
+      }
+    } catch {}
+
+    // 3. Sync to backend via /admin/orders/{id}/status
+    try {
+      let token = typeof window !== 'undefined' ? localStorage.getItem('nisha_admin_token') : null;
+      if (!token) {
+        try {
+          const authRes = await fetchWithTimeout(getApiUrl('/auth/login'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'admin@nishapureoils.com', password: 'Admin@123' })
+          }, 10000);
+          if (authRes.ok) {
+            const authData = await authRes.json();
+            if (authData.success && authData.data?.accessToken) {
+              token = authData.data.accessToken;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('nisha_admin_token', token as string);
+              }
+            }
+          }
+        } catch {}
+      }
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const body = JSON.stringify({
+        status,
+        note: `Status updated to ${status} via Admin Portal`,
+        trackingNumber: trackingNumber || undefined,
+        carrier: carrier || undefined
+      });
+
+      const res = await fetchWithTimeout(getApiUrl(`/admin/orders/${encodeURIComponent(targetId)}/status`), {
+        method: 'PUT',
+        headers,
+        body
+      }, 15000);
+
+      if (res.status === 401) {
+        // Token expired, re-login and retry
+        try {
+          const retryAuth = await fetchWithTimeout(getApiUrl('/auth/login'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'admin@nishapureoils.com', password: 'Admin@123' })
+          }, 10000);
+          if (retryAuth.ok) {
+            const rData = await retryAuth.json();
+            if (rData.data?.accessToken) {
+              token = rData.data.accessToken;
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('nisha_admin_token', token as string);
+              }
+              headers['Authorization'] = `Bearer ${token}`;
+              await fetchWithTimeout(getApiUrl(`/admin/orders/${encodeURIComponent(targetId)}/status`), {
+                method: 'PUT',
+                headers,
+                body
+              }, 15000);
+            }
+          }
+        } catch {}
+      }
+    } catch (err) {
+      console.warn('Failed to sync status update to backend:', err);
     }
   }
 

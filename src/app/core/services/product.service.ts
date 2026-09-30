@@ -289,6 +289,12 @@ export class ProductService {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
+        localStorage.setItem('nisha_last_product_update', Date.now().toString());
+        if ('BroadcastChannel' in window) {
+          const ch = new BroadcastChannel('nisha_products_channel');
+          ch.postMessage({ type: 'PRODUCT_UPDATED', timestamp: Date.now() });
+          ch.close();
+        }
       } catch (e) {
         console.warn('Failed to persist products to local storage:', e);
       }
@@ -299,6 +305,12 @@ export class ProductService {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+        localStorage.setItem('nisha_last_product_update', Date.now().toString());
+        if ('BroadcastChannel' in window) {
+          const ch = new BroadcastChannel('nisha_products_channel');
+          ch.postMessage({ type: 'CATEGORY_UPDATED', timestamp: Date.now() });
+          ch.close();
+        }
       } catch (e) {
         console.warn('Failed to persist categories to local storage:', e);
       }
@@ -309,6 +321,12 @@ export class ProductService {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(BRANDS_STORAGE_KEY, JSON.stringify(brands));
+        localStorage.setItem('nisha_last_product_update', Date.now().toString());
+        if ('BroadcastChannel' in window) {
+          const ch = new BroadcastChannel('nisha_products_channel');
+          ch.postMessage({ type: 'BRAND_UPDATED', timestamp: Date.now() });
+          ch.close();
+        }
       } catch (e) {
         console.warn('Failed to persist brands to local storage:', e);
       }
@@ -865,6 +883,17 @@ export class ProductService {
       this.persistProducts(updated);
       return updated;
     });
+
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('nisha_products_channel');
+        bc.postMessage({ type: 'PRODUCT_UPDATED', productId: resultProduct.id, timestamp: Date.now() });
+        bc.close();
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nisha_last_product_update', JSON.stringify({ productId: resultProduct.id, timestamp: Date.now() }));
+      }
+    } catch {}
 
     return resultProduct;
   }
