@@ -145,7 +145,7 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
                 formControlName="extractionMethod"
                 class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
               >
-                <option value="Wood-Churned Cold-Pressed">Wood-Churned Cold-Pressed (Marachekku)</option>
+                <option value="Wood-Churned Cold-Pressed">Wood-Churned Cold-Pressed (Chekku Oil)</option>
                 <option value="Cold-Pressed Virgin Copra">Cold-Pressed Virgin Copra</option>
                 <option value="Wood-Churned with Palm Jaggery">Wood-Churned with Palm Jaggery</option>
                 <option value="Pure Cold-Pressed Ricinus">Pure Cold-Pressed Ricinus</option>
@@ -177,7 +177,7 @@ import { FileUploadComponent } from '../../../shared/components/file-upload/file
             <textarea
               formControlName="description"
               rows="3"
-              placeholder="Provide cold-pressing method details, traditional Mara Chekku extraction, and aroma characteristics..."
+              placeholder="Provide cold-pressing method details, traditional Chekku oil extraction, and aroma characteristics..."
               class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
             ></textarea>
           </div>
@@ -345,7 +345,7 @@ export class ProductFormComponent implements OnInit {
     extractionMethod: ['Wood-Churned Cold-Pressed'],
     status: [ProductStatus.ACTIVE, Validators.required],
     description: ['100% traditional wood-pressed cold extraction preserving natural aroma, taste, and vital nutrients.'],
-    benefits: ['Cholesterol-free, 100% natural, Mara Chekku traditional cold-press method'],
+    benefits: ['Cholesterol-free, 100% natural, Chekku oil traditional cold-press method'],
     storageInstructions: ['Store in cool, dry place away from direct sunlight.'],
     variants: this.fb.array([])
   });

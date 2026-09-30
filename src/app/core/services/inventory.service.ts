@@ -128,7 +128,7 @@ export class InventoryService {
           stockQuantity: v.stockQuantity,
           reorderLevel: v.reorderLevel,
           batchNumber: `MC-${prod.id.slice(-4).toUpperCase()}-B${v.size.replace(/\D/g, '') || '1'}`,
-          warehouseLocation: 'Unit #1 Mara Chekku Shed',
+          warehouseLocation: 'Unit #1 Chekku Oil Shed',
           status
         });
       }

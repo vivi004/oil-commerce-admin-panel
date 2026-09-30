@@ -20,7 +20,7 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Warehouse & Stock Operations</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Mara Chekku cold-pressed oil batches, live inventory levels per SKU, and movement audit ledger.</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Chekku cold-pressed oil batches, live inventory levels per SKU, and movement audit ledger.</p>
         </div>
         <div class="flex items-center gap-2">
           <!-- Live Sync -->
@@ -265,7 +265,7 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
                 formControlName="warehouseLocation"
                 class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
               >
-                <option value="Unit 1 - Mara Chekku Mill">Unit 1 - Mara Chekku Mill</option>
+                <option value="Unit 1 - Chekku Oil Mill">Unit 1 - Chekku Oil Mill</option>
                 <option value="Unit 2 - Packing Station">Unit 2 - Packing Station</option>
                 <option value="Bulk Storage Silo #3">Bulk Storage Silo #3</option>
               </select>
@@ -277,7 +277,7 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
             <input
               type="text"
               formControlName="reason"
-              placeholder="e.g. Mara Chekku fresh milling batch #MC-882"
+              placeholder="e.g. Chekku oil fresh milling batch #MC-882"
               class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
             />
           </div>
@@ -340,8 +340,8 @@ export class InventoryManagementComponent {
     sku: ['', Validators.required],
     type: [StockMovementType.STOCK_IN, Validators.required],
     quantityChange: [50, Validators.required],
-    warehouseLocation: ['Unit 1 - Mara Chekku Mill', Validators.required],
-    reason: ['Mara Chekku fresh milling batch #MC-882', Validators.required]
+    warehouseLocation: ['Unit 1 - Chekku Oil Mill', Validators.required],
+    reason: ['Chekku oil fresh milling batch #MC-882', Validators.required]
   });
 
   currentProductVariants = computed(() => {

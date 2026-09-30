@@ -1,9 +1,9 @@
 SKU,Product Name,Variant Size,Current MRP,New MRP,Current Selling Price,New Selling Price,Current Stock,New Stock,GST Rate,Barcode,Category,Brand,Mandi Seed Rate Per Kg,Status,Notes
-NPO-GNO-200ML,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),200ml,110,115,95,99,80,100,5%,890123456011,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Batch #412 New Harvest
-NPO-GNO-500ML,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),500ml,210,220,185,195,95,110,5%,890123456012,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Batch #412 New Harvest
-NPO-GNO-1L,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),1L,390,395,340,355,120,75,5%,890123456013,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Mandi seed hike +₹4/kg
-NPO-GNO-5L,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),5L,1850,1920,1650,1710,40,25,5%,890123456014,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Tin packaging adjustment
-NPO-GNO-15L,Wood Pressed Groundnut Oil (Marachekku Kadalai Ennai),15L,4200,4350,3850,3990,10,15,5%,890123456015,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Bulk commercial tin
+NPO-GNO-200ML,Wood Pressed Groundnut Oil (Chekku Kadalai Ennai),200ml,110,115,95,99,80,100,5%,890123456011,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Batch #412 New Harvest
+NPO-GNO-500ML,Wood Pressed Groundnut Oil (Chekku Kadalai Ennai),500ml,210,220,185,195,95,110,5%,890123456012,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Batch #412 New Harvest
+NPO-GNO-1L,Wood Pressed Groundnut Oil (Chekku Kadalai Ennai),1L,390,395,340,355,120,75,5%,890123456013,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Mandi seed hike +₹4/kg
+NPO-GNO-5L,Wood Pressed Groundnut Oil (Chekku Kadalai Ennai),5L,1850,1920,1650,1710,40,25,5%,890123456014,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Tin packaging adjustment
+NPO-GNO-15L,Wood Pressed Groundnut Oil (Chekku Kadalai Ennai),15L,4200,4350,3850,3990,10,15,5%,890123456015,Groundnut Oil,Nisha Pure Oils,142,ACTIVE,Bulk commercial tin
 NPO-VCO-200ML,Cold Pressed Virgin Coconut Oil (Thengai Ennai),200ml,145,145,130,130,50,60,5%,890123456021,Coconut Oil,Nisha Pure Oils,195,ACTIVE,Stable copra price
 NPO-VCO-500ML,Cold Pressed Virgin Coconut Oil (Thengai Ennai),500ml,280,270,250,230,65,65,5%,890123456022,Coconut Oil,Nisha Pure Oils,195,ACTIVE,Kangayam copra discount promo
 NPO-VCO-1L,Cold Pressed Virgin Coconut Oil (Thengai Ennai),1L,520,520,470,470,60,80,5%,890123456023,Coconut Oil,Nisha Pure Oils,195,ACTIVE,Stable copra price

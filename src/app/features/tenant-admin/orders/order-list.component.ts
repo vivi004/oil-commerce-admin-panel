@@ -223,7 +223,7 @@ import { BadgeComponent } from '../../../shared/components/badge/badge.component
             <div>
               <div class="flex items-center gap-2 mb-1">
                 <span class="text-xl font-black text-amber-700">NISHA PURE OILS</span>
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase">Mara Chekku Mill</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase">Chekku Oil Mill</span>
               </div>
               <p class="text-slate-600 text-[11px]">SF No. 104, Avinashi Road, Tirupur, Tamil Nadu 641652</p>
               <p class="text-slate-600 text-[11px]">GSTIN: <strong>33AAACN1284P1Z3</strong> • FSSAI: <strong>12421008000451</strong></p>
